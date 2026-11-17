@@ -35,6 +35,7 @@ This manual covers what each role can do and where to find the trail FORGE leave
 
 A short tour of what arrived recently; each line points to the section that explains it.
 
+- **How much of the AI's first draft survives each review** — when **Auto-draft** writes a section, FORGE now keeps that text in the section's **Snapshots** as **AI draft** (compare it with the current text or restore it; it cannot be deleted). Each time a review round starts, FORGE notes how much of that draft is still in the section, and the proposal's **AI Draft Insights** panel shows the share kept at each round and now, with how many of each colour team's tracked suggestions the section owners accepted (§9.7).
 - **Web research before the first draft** — **Settings → AI Engine → AI and Search** has a switch (off until an admin turns it on), a list of sites FORGE may use, a list it must not, and your own monthly search cap, with what is left of the searches your plan includes. With it on, **Auto-draft** first searches the open web for public facts about the customer and the requirement, keeps the pages it cites as numbered sources with their address and the date, and the drafts cite them next to your own records. Your company's claims never come from the web (§4.12).
 - **Buy more web searches** — **Settings → Billing → Web search packs** sells a prepaid pack of 500 web searches as a one-time card payment. FORGE uses your plan's monthly searches first and the pack only when those are gone; pack searches do not expire, and there is no automatic top-up or overage charge: research simply pauses when both are at zero (§4.14).
 - **A meeting for each review round** — on a round's page, **Meeting** takes a link you paste from your own calendar (Teams, Zoom or Webex) and a start time. **Send invites** emails every reviewer a calendar invite (an `.ics` file) with the link and the sections they are scoped to, and the day before the meeting each reviewer gets a reminder with the link. See the review section under Reviews.
@@ -1169,7 +1170,7 @@ Closed reviews are read-only. You can open a closed review months later and repl
 
 ### 9.7 Section status changes
 
-Every proposal section carries `status`, `author`, `updatedAt`, and a free-text body. Updates to any of those bump `updatedAt` and stamp the editor. Prior versions of the body live in the editor's **Snapshots** sidebar: take one manually, or let FORGE capture one automatically when the section crosses a status milestone; every create, restore and delete is audited, and any snapshot can be diffed against the current text.
+Every proposal section carries `status`, `author`, `updatedAt`, and a free-text body. Updates to any of those bump `updatedAt` and stamp the editor. Prior versions of the body live in the editor's **Snapshots** sidebar: take one manually, or let FORGE capture one automatically when the section crosses a status milestone; every create, restore and delete is audited, and any snapshot can be diffed against the current text. When **Auto-draft** writes a section, the text it wrote is kept there too, marked **AI draft**: you can compare it with the current text or restore it, but not delete it, because it is what FORGE measures the finished section against.
 
 Tracked changes leave a trail too. When a section owner accepts or rejects a suggestion (one at a time or with Accept all / Reject all), FORGE records each decision — what was inserted or deleted, who suggested it, who resolved it — and writes an audit entry for the batch (`proposal_section.changes_resolved`). The Brain reads those decisions: phrasing owners keep becomes the register the AI drafter matches for your team, struck text becomes what it avoids. Two kinds of decision are kept apart:
 - **FORGE AI's own suggestions** are judged, never imitated. Text you accept from FORGE AI doesn't become "your team's phrasing", and doesn't count towards your author voice profile. Text you reject from FORGE AI is what the drafter avoids.
@@ -1179,6 +1180,10 @@ The proposal overview's **AI Draft Insights** panel shows:
 - **FORGE AI suggestions accepted**, measured by words;
 - how often teammates' insertions and deletions are kept;
 - **AI content retained**: how many of a draft's phrases survive. A draft is graded only once it has been reviewed (no open suggestions, and at least 30 minutes after it was written), so merely saving right after drafting no longer scores it as fully kept.
+- **AI first draft kept, through each review**: for the sections Auto-draft wrote, the share of that first draft still in the text when each review round started (Pink Team, Red Team and so on) and now. Longer drafts weigh more. A falling line is normal: it shows how much your writers and reviewers rewrote at each step. A round started before any section had an AI draft is not listed.
+- **Reviewers' suggestions accepted**: of the tracked changes that a colour team's reviewers suggested, the share the section owners accepted, per colour team. A suggestion counts for the latest started round its author was a reviewer on.
+
+These measures stay inside your organization: no other FORGE customer's edits or drafts are read, and yours are never shown to them.
 
 ### 9.8 Compliance matrix history
 

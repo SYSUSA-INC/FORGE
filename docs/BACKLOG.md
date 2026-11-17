@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) is merged; 5b-2b (Checkout, the webhook, refunds, the Billing page, migration 0174) is in its own PR. 5d (learning) comes last.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review; migration 0175) is in its own PR; 5d-2 (the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) follows.
 
 ---
 
@@ -4002,7 +4002,7 @@ Every requirement in the FORGE II document, with its status and phase:
    `tests/isolation/review-meeting.test.ts` (tenant B cannot read, set,
    clear or invite for tenant A's round). Not done: a meeting end time
    (every meeting is one hour), RSVP tracking. Phase 5b waits on the
-   search provider; 5d (learning) comes last.
+   search provider; 5d (learning) comes last (5d-1 below).
 6. **Deliver:** submit from the portal by email, sent from a platform
    address with a per-opportunity reply address; replies received in
    FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox
@@ -4096,7 +4096,7 @@ Every requirement in the FORGE II document, with its status and phase:
    pack line when a balance is held; `/admin/orgs/[id]` has the correction
    control. Tests: `tests/isolation/search-credits.test.ts`.
 
-   **5b-2b shipped** (this PR, migration 0174: `stripe_payment_intent_id`
+   **5b-2b shipped** (#500, migration 0174: `stripe_payment_intent_id`
    on the ledger). `createSearchPackCheckoutAction` (org admin, plan with
    Auto-draft; Checkout `mode: "payment"`, card only, the catalogue price
    inline; audit `billing.search_pack.checkout_start`). The webhook's
@@ -4112,6 +4112,28 @@ Every requirement in the FORGE II document, with its status and phase:
    events. No admin screen for the catalogue yet (edit `search_pack`).
    Tests: `tests/stripe/search-pack.test.ts`,
    `tests/ai/search-pack-logic.test.ts`.
+
+   **5d-1 shipped** (this PR, migration 0175; design §2.5, additions 1
+   and 2, and D-8's measure). (1) Auto-draft keeps the text it wrote as
+   a `proposal_section_snapshot` of kind `ai_draft` ("AI draft" in the
+   Snapshots sidebar; it can be compared and restored, not deleted).
+   (2) `section_change_decision` gains `review_id` and `review_color`:
+   `recordChangeDecisionsAction` stores the newest started round the
+   suggestion's author was a reviewer on (`reviewRoundsForAuthors`).
+   (3) `section_draft_retention`: when a round starts,
+   `measureRetentionAtReview` records per section the share of its AI
+   draft still in the text (four-word runs, `shingleRetention`). The AI
+   Draft Insights panel shows **AI first draft kept, through each
+   review** (each round and now, weighted by draft length) and
+   **Reviewers' suggestions accepted** per colour team. Code:
+   `src/lib/draft-learning.ts`, `draft-learning-logic.ts`. Tests:
+   `tests/ai/draft-learning.test.ts`,
+   `tests/isolation/draft-learning.test.ts` (tenant B reads and measures
+   nothing of tenant A's). Not done here: an `ai_draft` snapshot for a
+   draft made with the editor's Draft button (its text is already in
+   `section_draft_signal`; a discarded draft would clutter Snapshots);
+   the measure is taken when a round starts, not when it closes. 5d-2
+   (the style note, its weekly rebuild and its panel) follows.
 
 ---
 

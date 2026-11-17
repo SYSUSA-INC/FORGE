@@ -118,7 +118,7 @@ export function SnapshotDiffViewer({
             </h3>
             <p className="font-mono text-[10px] text-muted">
               <span className="text-rose">−</span>{" "}
-              {snapshotMeta.label || (snapshotMeta.kind === "auto" ? "checkpoint" : "manual")}
+              {snapshotMeta.label || (snapshotMeta.kind === "manual" ? "manual" : "checkpoint")}
               {" "}
               <span className="text-subtle">
                 · {snapshotMeta.createdByName || "Unknown"} ·{" "}

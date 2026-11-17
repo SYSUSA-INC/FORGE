@@ -206,6 +206,15 @@ export async function startReviewAction(input: {
       },
     });
 
+    // BL-NAV-LIFECYCLE 5d — how much of each section's AI draft is still in
+    // the text the reviewers are about to read. Best-effort: never blocks the round.
+    try {
+      const { measureRetentionAtReview } = await import("@/lib/draft-learning");
+      await measureRetentionAtReview({ organizationId, proposalId: input.proposalId, reviewId: review.id });
+    } catch (err) {
+      log.warn("[startReviewAction]", "draft retention measure failed", { reviewId: review.id, error: err });
+    }
+
     // BL-13 — fire the rules engine.
     await dispatchTriggerEvent({
       organizationId,

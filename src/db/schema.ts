@@ -1495,9 +1495,16 @@ export const sectionChangeDecisions = pgTable(
     /** The affected text, capped at write time. */
     changeText: text("text").notNull().default(""),
     wordCount: integer("word_count").notNull().default(0),
+    /**
+     * BL-NAV-LIFECYCLE 5d — the colour-team round the suggestion came from, when its
+     * author was a reviewer on one (drizzle/0175). Null for a teammate's own edit.
+     */
+    reviewId: uuid("review_id").references((): AnyPgColumn => proposalReviews.id, { onDelete: "set null" }),
+    reviewColor: text("review_color"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    reviewIdx: index("scd_review_idx").on(t.reviewId).where(sql`${t.reviewId} IS NOT NULL`),
     orgCreatedIdx: index("scd_org_created_idx").on(t.organizationId, t.createdAt),
     orgKindDecisionIdx: index("scd_org_kind_decision_idx").on(
       t.organizationId,
@@ -1512,6 +1519,41 @@ export const sectionChangeDecisions = pgTable(
 
 export type SectionChangeDecision = typeof sectionChangeDecisions.$inferSelect;
 export type NewSectionChangeDecision = typeof sectionChangeDecisions.$inferInsert;
+
+/**
+ * BL-NAV-LIFECYCLE 5d — how much of a section's AI draft was still in its
+ * text when a review round started (drizzle/0175). One row per (round,
+ * section), written once by `measureRetentionAtReview`
+ * (src/lib/draft-retention.ts); the Draft insights panel reads them.
+ */
+export const sectionDraftRetentions = pgTable(
+  "section_draft_retention",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => proposalSections.id, { onDelete: "cascade" }),
+    reviewId: uuid("review_id")
+      .notNull()
+      .references((): AnyPgColumn => proposalReviews.id, { onDelete: "cascade" }),
+    reviewColor: text("review_color").notNull(),
+    sectionKind: text("section_kind").notNull().default(""),
+    draftWordCount: integer("draft_word_count").notNull().default(0),
+    keptWordCount: integer("kept_word_count").notNull().default(0),
+    keptFraction: real("kept_fraction").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    reviewSectionIdx: uniqueIndex("section_draft_retention_review_section_idx").on(t.reviewId, t.sectionId),
+    orgProposalIdx: index("section_draft_retention_org_proposal_idx").on(t.organizationId, t.proposalId),
+  }),
+);
 
 export type TipTapDoc = {
   type: "doc";
@@ -1538,7 +1580,8 @@ export type ProposalSectionSnapshot =
   typeof proposalSectionSnapshots.$inferSelect;
 export type NewProposalSectionSnapshot =
   typeof proposalSectionSnapshots.$inferInsert;
-export type ProposalSectionSnapshotKind = "manual" | "auto";
+/** `ai_draft` (BL-NAV-LIFECYCLE 5d) is the text FORGE AI wrote, kept so the final text can be compared with it. */
+export type ProposalSectionSnapshotKind = "manual" | "auto" | "ai_draft";
 
 export const companyRelationshipEnum = pgEnum("company_relationship", [
   "customer",

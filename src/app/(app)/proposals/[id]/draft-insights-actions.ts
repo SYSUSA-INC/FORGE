@@ -1,6 +1,9 @@
 "use server";
 
 import { and, avg, count, eq, isNotNull, ne } from "drizzle-orm";
+import { REVIEW_COLORS } from "@/lib/review-types";
+import { loadDraftRetention, type DraftRetention } from "@/lib/draft-learning";
+import { reviewerDecisionStats, type ReviewerDecisionStat } from "@/lib/draft-learning-logic";
 import { db } from "@/db";
 import { sectionChangeDecisions, sectionDraftSignals } from "@/db/schema";
 import { aiSuggestionAcceptance } from "@/lib/ai-acceptance";
@@ -38,6 +41,10 @@ export type DraftInsights = {
   abComparisonCount: number;
   abVariantBWinRate: number | null;
   editDecisions: EditDecisionStats;
+  /** BL-NAV-LIFECYCLE 5d — the share of the AI's first drafts still in the text at each review, and now. */
+  retention: DraftRetention;
+  /** BL-NAV-LIFECYCLE 5d — what happened to the colour-team reviewers' suggestions, per colour. */
+  reviewerDecisions: ReviewerDecisionStat[];
 };
 
 export async function getDraftInsightsAction(
@@ -143,6 +150,28 @@ export async function getDraftInsightsAction(
     const ai = aiSuggestionAcceptance(
       aiRows.map((r) => ({ decision: r.decision === "accept" ? "accept" : "reject", bulk: r.bulk, wordCount: r.wordCount })),
     );
+    // BL-NAV-LIFECYCLE 5d — reviewers' suggestions, by the colour of the round they came from.
+    const reviewerRows = await db
+      .select({
+        reviewColor: sectionChangeDecisions.reviewColor,
+        decision: sectionChangeDecisions.decision,
+        n: count(sectionChangeDecisions.id),
+      })
+      .from(sectionChangeDecisions)
+      .where(
+        and(
+          eq(sectionChangeDecisions.proposalId, proposalId),
+          eq(sectionChangeDecisions.organizationId, organizationId),
+          isNotNull(sectionChangeDecisions.reviewColor),
+        ),
+      )
+      .groupBy(sectionChangeDecisions.reviewColor, sectionChangeDecisions.decision);
+    const reviewerDecisions = reviewerDecisionStats(
+      reviewerRows.map((r) => ({ reviewColor: r.reviewColor ?? "", decision: r.decision, n: Number(r.n) })),
+      REVIEW_COLORS.map((c) => c.key),
+    );
+    const retention = await loadDraftRetention({ organizationId, proposalId });
+
     const tally = (type: string, decision: string) =>
       Number(decisionRows.find((r) => r.changeType === type && r.decision === decision)?.n ?? 0);
     const insertsTotal = tally("insert", "accept") + tally("insert", "reject");
@@ -173,6 +202,8 @@ export async function getDraftInsightsAction(
         abComparisonCount,
         abVariantBWinRate,
         editDecisions,
+        retention,
+        reviewerDecisions,
       },
     };
   } catch (err) {

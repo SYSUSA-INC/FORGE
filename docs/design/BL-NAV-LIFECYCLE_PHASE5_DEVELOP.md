@@ -112,7 +112,11 @@ reports the kept share through each review.
    now, the guest review page and its token table (split in two PRs if
    it passes the budget).
 4. **5d — learning** (§2.5): the `ai_draft` snapshot, reviewer-edit
-   capture, the style note and its panel.
+   capture, the style note and its panel. Built in two PRs: **5d-1**
+   (migration 0175) the `ai_draft` snapshot (a snapshot `kind`, written
+   by Auto-draft), the round and colour on a reviewer's
+   `section_change_decision`, and the kept share measured when each
+   round starts (`section_draft_retention`); **5d-2** the style note.
 
 ## 4. Decisions for the owner
 

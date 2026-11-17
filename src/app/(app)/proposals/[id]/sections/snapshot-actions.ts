@@ -21,7 +21,7 @@
  * proposal, and audit the action.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
@@ -51,6 +51,10 @@ export type SectionSnapshotSummary = {
   createdByUserId: string | null;
   createdByName: string;
 };
+
+function snapshotKind(kind: string): ProposalSectionSnapshotKind {
+  return kind === "auto" || kind === "ai_draft" ? kind : "manual";
+}
 
 async function loadOwnedSection(input: {
   proposalId: string;
@@ -167,7 +171,7 @@ export async function listSectionSnapshotsAction(input: {
 
   const snapshots: SectionSnapshotSummary[] = rows.map((r) => ({
     id: r.id,
-    kind: (r.kind === "auto" ? "auto" : "manual") as ProposalSectionSnapshotKind,
+    kind: snapshotKind(r.kind),
     label: r.label,
     wordCount: r.wordCount,
     createdAt: r.createdAt.toISOString(),
@@ -230,7 +234,7 @@ export async function getSectionSnapshotBodyAction(input: {
     bodyDoc: row.bodyDoc,
     meta: {
       id: row.id,
-      kind: (row.kind === "auto" ? "auto" : "manual") as ProposalSectionSnapshotKind,
+      kind: snapshotKind(row.kind),
       label: row.label,
       wordCount: row.wordCount,
       createdAt: row.createdAt.toISOString(),
@@ -346,6 +350,8 @@ export async function deleteSectionSnapshotAction(input: {
   });
   if (!section) return { ok: false, error: "Section not found." };
 
+  // BL-NAV-LIFECYCLE 5d — the AI's draft is what the final text is measured
+  // against; it stays (ne() below), and the caller is told why.
   const result = await db
     .delete(proposalSectionSnapshots)
     .where(
@@ -353,11 +359,12 @@ export async function deleteSectionSnapshotAction(input: {
         eq(proposalSectionSnapshots.id, input.snapshotId),
         eq(proposalSectionSnapshots.proposalSectionId, section.id),
         eq(proposalSectionSnapshots.organizationId, organizationId),
+        ne(proposalSectionSnapshots.kind, "ai_draft"),
       ),
     )
     .returning({ id: proposalSectionSnapshots.id });
   if (result.length === 0) {
-    return { ok: false, error: "Snapshot not found." };
+    return { ok: false, error: "Snapshot not found, or it is the AI draft, which is kept so the final text can be compared with it." };
   }
 
   await recordAudit({
