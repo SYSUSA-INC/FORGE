@@ -20,6 +20,7 @@ import {
   uuid,
   varchar,
   type AnyPgColumn,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -4449,6 +4450,83 @@ export const proposalResearchSources = pgTable(
 );
 
 export type ProposalResearchSource = typeof proposalResearchSources.$inferSelect;
+
+/**
+ * BL-NAV-LIFECYCLE 5b-2 — the prepaid search packs FORGE sells. Platform-wide
+ * (no tenant column). The price goes inline to Stripe Checkout. Migration 0173.
+ */
+export const searchPacks = pgTable(
+  "search_pack",
+  {
+    slug: varchar("slug", { length: 64 }).primaryKey(),
+    name: text("name").notNull(),
+    searches: integer("searches").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("usd"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    searchesCheck: check("search_pack_searches_check", sql`${t.searches} > 0`),
+    priceCheck: check("search_pack_price_cents_check", sql`${t.priceCents} > 0`),
+  }),
+);
+
+export type SearchPack = typeof searchPacks.$inferSelect;
+
+/**
+ * BL-NAV-LIFECYCLE 5b-2 — the pack searches a tenant holds: one row per
+ * organization, never below zero. Drawn only after the plan's monthly
+ * allowance; no expiry. Migration 0173.
+ */
+export const tenantSearchCredits = pgTable(
+  "tenant_search_credit",
+  {
+    organizationId: uuid("organization_id")
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    balance: integer("balance").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    balanceCheck: check("tenant_search_credit_balance_check", sql`${t.balance} >= 0`),
+  }),
+);
+
+export type SearchCreditKind = "purchase" | "draw" | "release" | "refund" | "adjust";
+
+/**
+ * BL-NAV-LIFECYCLE 5b-2 — the append-only ledger behind a tenant's pack
+ * balance. Every change writes one entry in the same transaction, so the
+ * balance equals the sum of its entries. Migration 0173.
+ */
+export const searchCreditEntries = pgTable(
+  "search_credit_entry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    delta: integer("delta").notNull(),
+    kind: varchar("kind", { length: 16 }).$type<SearchCreditKind>().notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    packSlug: varchar("pack_slug", { length: 64 }),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripeEventId: text("stripe_event_id"),
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("search_credit_entry_org_idx").on(t.organizationId, t.createdAt),
+    sessionIdx: uniqueIndex("search_credit_entry_session_idx")
+      .on(t.stripeCheckoutSessionId)
+      .where(sql`${t.stripeCheckoutSessionId} IS NOT NULL`),
+  }),
+);
+
+export type SearchCreditEntry = typeof searchCreditEntries.$inferSelect;
 export type NewTenantUsageCounter = typeof tenantUsageCounters.$inferInsert;
 
 /**

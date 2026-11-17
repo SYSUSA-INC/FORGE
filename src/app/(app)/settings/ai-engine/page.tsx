@@ -48,6 +48,8 @@ const EMPTY_RESEARCH: ResearchState = {
   used: 0,
   remaining: 0,
   trialEnded: false,
+  packBalance: 0,
+  available: 0,
   provider: "stub",
   providerReady: false,
 };
@@ -143,6 +145,7 @@ export default async function AiEnginePage() {
           cap={research.cap}
           used={research.used}
           remaining={research.remaining}
+          packBalance={research.packBalance}
           trialEnded={research.trialEnded}
           providerReady={research.providerReady}
           monthLabel={monthLabel}

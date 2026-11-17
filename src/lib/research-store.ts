@@ -91,6 +91,10 @@ export type ResearchState = {
   used: number;
   remaining: number;
   trialEnded: boolean;
+  /** Prepaid pack searches held; used only after the plan's. */
+  packBalance: number;
+  /** The plan's remaining plus the pack; 0 when the trial has ended. */
+  available: number;
   provider: AIProviderName;
   /** True when research can actually run: the Anthropic provider is active. */
   providerReady: boolean;

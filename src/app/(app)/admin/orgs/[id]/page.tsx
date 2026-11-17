@@ -30,6 +30,8 @@ import { TenantDomainsEditor } from "./TenantDomainsEditor";
 import { TenantAddonsSection } from "./TenantAddonsSection";
 import { TenantApiTokensSection } from "./TenantApiTokensSection";
 import { TrialControls } from "./TrialControls";
+import { SearchCreditsControl } from "./SearchCreditsControl";
+import { getSearchCreditBalance } from "@/lib/search-credits";
 
 export const dynamic = "force-dynamic";
 
@@ -164,7 +166,8 @@ export default async function TenantDetailPage({
   // BL-16 Phase C-2 — also load the list of active tiers for the
   // assignment dropdown. BL-TIER-ASSIGN — always: a tenant with no
   // subscription row is exactly the one that needs the dropdown.
-  const [currentTier, activeTiers] = await Promise.all([
+  const [searchCreditBalance, currentTier, activeTiers] = await Promise.all([
+    getSearchCreditBalance(org.id).catch(() => 0),
     getCurrentTier(org.id),
     listActiveTiersAction(),
   ]);
@@ -388,6 +391,8 @@ export default async function TenantDetailPage({
                   : { kind: "active", endsAt: currentTier.trial.endsAt?.toISOString() ?? null, daysLeft: currentTier.trial.daysLeft }
             }
           />
+          {/* BL-NAV-LIFECYCLE 5b-2a — the prepaid web-search pack balance and its correction */}
+          <SearchCreditsControl organizationId={org.id} balance={searchCreditBalance} />
           {activeTiers.length > 0 ? (
             <TierAssignmentForm
               organizationId={org.id}

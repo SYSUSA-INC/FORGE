@@ -703,6 +703,11 @@ export async function enforceStorageQuota(
 // every other monthly quota. A run reserves its searches BEFORE it starts
 // with one atomic statement that refuses to pass the cap, then gives back
 // what it did not use. Two runs racing cannot overspend.
+//
+// 5b-2a — when the plan's searches are gone, the run draws the tenant's
+// prepaid pack balance (src/lib/search-credits.ts). The plan always goes
+// first, a give-back returns to the pack first, and the tenant's own cap
+// limits the plan's searches only: a pack is already paid for.
 // ─────────────────────────────────────────────────────────────────────
 
 /** The searches a tenant has this month: the plan's, after the tenant's own cap, and what is used. */
@@ -712,57 +717,111 @@ export async function getWebSearchAllowance(organizationId: string): Promise<{
   used: number;
   remaining: number;
   trialEnded: boolean;
+  /** Prepaid pack searches held (used only after the plan's). */
+  packBalance: number;
+  /** What a run can take now: the plan's remaining plus the pack; 0 when the trial has ended. */
+  available: number;
 }> {
   const { searchAllowance } = await import("@/lib/research-logic");
+  const { getSearchCreditBalance } = await import("@/lib/search-credits");
   const tier = await getCurrentTier(organizationId);
-  const used = await getCurrentUsage(organizationId, "webSearchesPerMonth");
+  const [used, packBalance] = await Promise.all([
+    getCurrentUsage(organizationId, "webSearchesPerMonth"),
+    getSearchCreditBalance(organizationId),
+  ]);
   const a = searchAllowance({
     planAllowance: tier?.platformQuotas.webSearchesPerMonth,
     tenantCap: typeof tier?.overrides.research?.monthlyCap === "number" ? tier.overrides.research.monthlyCap : null,
     used,
   });
   const trialEnded = trialRefusal(tier) !== null;
-  return { ...a, remaining: trialEnded ? 0 : a.remaining, trialEnded };
+  const remaining = trialEnded ? 0 : a.remaining;
+  return { ...a, remaining, trialEnded, packBalance, available: trialEnded ? 0 : remaining + packBalance };
 }
 
 /**
- * Reserve up to `want` searches (all or fewer: what is left under the cap).
- * Returns how many were reserved; 0 means do not search. The increment is a
- * single guarded upsert, so it never takes the counter past the cap.
+ * Reserve up to `want` searches (all or fewer: what is left). The plan's
+ * monthly allowance goes first, with a single guarded upsert that never
+ * takes the counter past the cap; the rest comes from the tenant's prepaid
+ * pack balance, which cannot go below zero. Returns how many were
+ * reserved and from where; 0 means do not search.
  */
-export async function reserveWebSearches(organizationId: string, want: number): Promise<{ reserved: number; cap: number; used: number }> {
+export async function reserveWebSearches(
+  organizationId: string,
+  want: number,
+  opts: { proposalId?: string | null } = {},
+): Promise<{ reserved: number; fromPlan: number; fromPack: number; cap: number; used: number }> {
   const { searchesToReserve } = await import("@/lib/research-logic");
   const allowance = await getWebSearchAllowance(organizationId);
-  const n = searchesToReserve(allowance.remaining, want);
-  if (n <= 0) return { reserved: 0, cap: allowance.cap, used: allowance.used };
-  const { periodStart, periodEnd } = currentMonthPeriod();
-  try {
-    const rows = await db
-      .insert(tenantUsageCounters)
-      .values({ organizationId, key: "webSearchesPerMonth", periodStart, periodEnd, value: n })
-      .onConflictDoUpdate({
-        target: [tenantUsageCounters.organizationId, tenantUsageCounters.key, tenantUsageCounters.periodStart],
-        set: { value: sql`${tenantUsageCounters.value} + ${n}`, updatedAt: new Date() },
-        setWhere: sql`${tenantUsageCounters.value} + ${n} <= ${allowance.cap}`,
-      })
-      .returning({ value: tenantUsageCounters.value });
-    // No row back: another run took the room first; nothing was added.
-    if (rows.length === 0) return { reserved: 0, cap: allowance.cap, used: allowance.used };
-    return { reserved: n, cap: allowance.cap, used: rows[0].value };
-  } catch (err) {
-    log.error("[reserveWebSearches]", "reserve failed", { error: err, organizationId, want });
-    return { reserved: 0, cap: allowance.cap, used: allowance.used };
+  const none = { reserved: 0, fromPlan: 0, fromPack: 0, cap: allowance.cap, used: allowance.used };
+  const wanted = Math.max(0, Math.floor(want));
+  if (wanted === 0 || allowance.trialEnded) return none;
+
+  let fromPlan = 0;
+  let used = allowance.used;
+  const n = searchesToReserve(allowance.remaining, wanted);
+  if (n > 0) {
+    const { periodStart, periodEnd } = currentMonthPeriod();
+    try {
+      const rows = await db
+        .insert(tenantUsageCounters)
+        .values({ organizationId, key: "webSearchesPerMonth", periodStart, periodEnd, value: n })
+        .onConflictDoUpdate({
+          target: [tenantUsageCounters.organizationId, tenantUsageCounters.key, tenantUsageCounters.periodStart],
+          set: { value: sql`${tenantUsageCounters.value} + ${n}`, updatedAt: new Date() },
+          setWhere: sql`${tenantUsageCounters.value} + ${n} <= ${allowance.cap}`,
+        })
+        .returning({ value: tenantUsageCounters.value });
+      // No row back: another run took the room first; nothing was added.
+      if (rows.length > 0) {
+        fromPlan = n;
+        used = rows[0].value;
+      }
+    } catch (err) {
+      log.error("[reserveWebSearches]", "reserve failed", { error: err, organizationId, want });
+      return none;
+    }
   }
+
+  let fromPack = 0;
+  if (wanted > fromPlan && allowance.packBalance > 0) {
+    try {
+      const { drawSearchCredits } = await import("@/lib/search-credits");
+      fromPack = await drawSearchCredits({ organizationId, want: wanted - fromPlan, proposalId: opts.proposalId });
+    } catch (err) {
+      log.error("[reserveWebSearches]", "pack draw failed", { error: err, organizationId, want });
+    }
+  }
+  return { reserved: fromPlan + fromPack, fromPlan, fromPack, cap: allowance.cap, used };
 }
 
-/** Give back reserved searches that were not run. Never below zero. */
-export async function releaseWebSearches(organizationId: string, count: number): Promise<void> {
+/**
+ * Give back reserved searches that were not run. `fromPack` is how many of
+ * the reservation came from the pack: those go back first, so paid searches
+ * are never spent while included ones are returned. Never below zero.
+ */
+export async function releaseWebSearches(
+  organizationId: string,
+  count: number,
+  opts: { fromPack?: number; proposalId?: string | null } = {},
+): Promise<void> {
   if (count <= 0) return;
+  const toPack = Math.max(0, Math.min(Math.floor(count), Math.floor(opts.fromPack ?? 0)));
+  const toPlan = count - toPack;
+  if (toPack > 0) {
+    try {
+      const { returnSearchCredits } = await import("@/lib/search-credits");
+      await returnSearchCredits({ organizationId, count: toPack, proposalId: opts.proposalId });
+    } catch (err) {
+      log.error("[releaseWebSearches]", "pack release failed", { error: err, organizationId, count: toPack });
+    }
+  }
+  if (toPlan <= 0) return;
   const { periodStart } = currentMonthPeriod();
   try {
     await db
       .update(tenantUsageCounters)
-      .set({ value: sql`GREATEST(0, ${tenantUsageCounters.value} - ${count})`, updatedAt: new Date() })
+      .set({ value: sql`GREATEST(0, ${tenantUsageCounters.value} - ${toPlan})`, updatedAt: new Date() })
       .where(
         and(
           eq(tenantUsageCounters.organizationId, organizationId),
@@ -771,6 +830,6 @@ export async function releaseWebSearches(organizationId: string, count: number):
         ),
       );
   } catch (err) {
-    log.warn("[releaseWebSearches]", "release failed", { error: err, organizationId, count });
+    log.warn("[releaseWebSearches]", "release failed", { error: err, organizationId, count: toPlan });
   }
 }

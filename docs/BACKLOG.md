@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs) has its design for review in `docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md` (six owner decisions, each with a recommendation); it is built in two PRs (5b-2a credits and the draw, 5b-2b Checkout and the webhook) once the owner answers. 5d comes last.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (the balance, the ledger and the draw, migration 0173) is in its own PR; 5b-2b (Checkout, the webhook, refunds, the Billing page) follows once it merges. 5d comes last.
 
 ---
 
@@ -4078,6 +4078,23 @@ Every requirement in the FORGE II document, with its status and phase:
    about the company, never an instruction) only when a web source is
    present. The Auto-draft dialog shows the research line. Tests: the run,
    the wait and the queueing in `tests/isolation/research.test.ts`.
+
+   **5b-2a shipped** (this PR, migration 0173). `search_pack` (the
+   catalogue, seeded with 500 searches for $25; unused until 5b-2b),
+   `tenant_search_credit` (one balance per tenant, `CHECK (balance >= 0)`)
+   and `search_credit_entry` (append-only ledger; a unique Checkout
+   session id is ready for idempotent crediting). `search-credits.ts`:
+   `drawSearchCredits` locks the row and takes what is there,
+   `returnSearchCredits`, `adjustSearchCredits` (a platform admin's
+   correction, refused below zero, note required, audit
+   `admin.search_credit.adjust`), each with its ledger entry in the same
+   transaction. `reserveWebSearches` now returns `fromPlan` and
+   `fromPack`: the plan's guarded upsert first, the pack for the rest;
+   `releaseWebSearches` gives back to the pack first.
+   `getWebSearchAllowance` adds `packBalance` and `available`; Auto-draft
+   queues research when either is left. The AI and Search panel shows the
+   pack line when a balance is held; `/admin/orgs/[id]` has the correction
+   control. No way to buy yet. Tests: `tests/isolation/search-credits.test.ts`.
 
 ---
 
