@@ -46,6 +46,7 @@ const QUOTA_LABELS: Record<keyof TierQuotas, string> = {
   seatsIncluded: "Seats included",
   storageGb: "Storage (GB)",
   proposalsPerMonth: "Proposals / month",
+  webSearchesPerMonth: "Web searches / month (draft research)",
 };
 
 function formatPrice(cents: number, cadence: "mo" | "yr"): string {
@@ -56,6 +57,8 @@ function formatPrice(cents: number, cadence: "mo" | "yr"): string {
 }
 
 function formatQuota(key: keyof TierQuotas, value: number): string {
+  // A search costs money: 0 or absent means none included, never unlimited.
+  if (key === "webSearchesPerMonth") return value > 0 ? value.toLocaleString() : "Not included";
   if (value === 0) return "Unlimited";
   if (key === "aiTokensPerMonth" && value >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;

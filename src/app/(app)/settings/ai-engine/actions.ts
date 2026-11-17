@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-helpers";
 import { setAiBudget, setAiFeatureRouting, setPrepareAhead, type AiControlResult } from "@/lib/ai-engine-control";
 import type { AiModelClass } from "@/lib/ai-routing";
+import { setResearchSettings } from "@/lib/research-store";
 import { runGoldenEval } from "@/lib/golden-eval";
 import { runRetrievalEval } from "@/lib/retrieval-eval";
 import { recordAudit } from "@/lib/audit-log";
@@ -60,6 +61,34 @@ export async function setAiBudgetAction(input: {
   });
   if (res.ok) revalidatePath("/settings/ai-engine");
   return res.ok ? { ok: true } : res;
+}
+
+/**
+ * BL-NAV-LIFECYCLE 5b — the "AI and Search" settings: the web research
+ * switch, the allowed and blocked domains and the organization's own
+ * monthly search cap. Org admins only; audited by the lib.
+ */
+export async function setResearchSettingsAction(input: {
+  enabled: boolean;
+  allowedDomains: string;
+  blockedDomains: string;
+  monthlyCap: number | null;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { organizationId } = await requireCurrentOrg();
+  const actor = await requireOrgAdmin(organizationId);
+  const res = await setResearchSettings({
+    organizationId,
+    input: {
+      enabled: input.enabled === true,
+      allowedDomains: input.allowedDomains,
+      blockedDomains: input.blockedDomains,
+      monthlyCap: input.monthlyCap,
+    },
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (!res.ok) return res;
+  revalidatePath("/settings/ai-engine");
+  return { ok: true };
 }
 
 /** BL-NEXT-ACTION 5c — the Prepare ahead switch. Org admins only. */

@@ -61,6 +61,7 @@ export const PROMPT_VERSIONS: Record<PromptedFeature, string> = {
   gold_annotate: "2026-10-07.1",
   draft_judge: "2026-10-07.2",
   solicitation_structure: "2026-10-07.1",
+  develop_research: "2026-11-16.1",
 };
 
 /** The version the gateway records for a feature; "" for one that sends no prompt. */

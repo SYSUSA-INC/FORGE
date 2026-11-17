@@ -13,6 +13,7 @@ import { analysisReportSchema, buildAnalysisReportPrompt } from "@/lib/analysis-
 import type { z } from "zod";
 import type { AIMessage } from "@/lib/ai";
 import type { PromptedFeature } from "@/lib/ai-prompt-versions";
+import { buildResearchPrompt } from "@/lib/research-logic";
 import {
   artifactKindClassifySchema,
   brainAnswerSchema,
@@ -594,6 +595,10 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
       draft: "We migrate in three reversible waves, each with a tested rollback.",
     }),
   ],
+  develop_research: () => {
+    const p = buildResearchPrompt({ agency: "Department of Veterans Affairs", title: "ITSM modernization", naicsCode: "541512", description: "Modernize the IT service management platform." });
+    return [{ system: p.system, messages: [{ role: "user", content: p.user }] }];
+  },
   solicitation_structure: () => [
     buildSectionLStructurePrompt({ documentLabel: "RFP.pdf", partLabel: "Section L — Instructions, conditions and notices to offerors", text: RFP_TEXT, truncated: false }),
     buildSectionMStructurePrompt({ documentLabel: "RFP.pdf", partLabel: "Section M — Evaluation factors for award", text: RFP_TEXT, truncated: true }),
@@ -641,6 +646,8 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   gold_annotate: [goldAnnotateSchema],
   draft_judge: [draftJudgeSchema],
   solicitation_structure: [sectionLStructureSchema, sectionMStructureSchema],
+  // Free text with web search; no output tool.
+  develop_research: [],
 };
 
 function scanPrompt(): RenderedPrompt {

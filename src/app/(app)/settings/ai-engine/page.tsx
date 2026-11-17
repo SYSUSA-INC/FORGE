@@ -16,6 +16,9 @@ import { AIEngineTab } from "../AIEngineTab";
 import { AiControlPanel } from "./AiControlPanel";
 import { GoldenEvalPanel, type MyRatings } from "./GoldenEvalPanel";
 import { RetrievalEvalPanel } from "./RetrievalEvalPanel";
+import { ResearchPanel } from "./ResearchPanel";
+import { getResearchState, type ResearchState } from "@/lib/research-store";
+import { DEFAULT_RESEARCH_SETTINGS } from "@/lib/research-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,17 @@ const EMPTY_STATE: AiControlState = {
   routingOn: true,
 };
 
+const EMPTY_RESEARCH: ResearchState = {
+  settings: DEFAULT_RESEARCH_SETTINGS,
+  planAllowance: 0,
+  cap: 0,
+  used: 0,
+  remaining: 0,
+  trialEnded: false,
+  provider: "stub",
+  providerReady: false,
+};
+
 export default async function AiEnginePage() {
   const { user, organizationId } = await requireCurrentOrg();
   const isAdmin = user.isSuperadmin || (!!user.role && ORG_ADMIN_ROLES.includes(user.role));
@@ -48,7 +62,7 @@ export default async function AiEnginePage() {
 
   // BL-AIP-7c — the control panel's state and this month's usage;
   // BL-AIP-5b — golden eval history and the size of the golden set.
-  const [state, usage, runs, cases, retrievalRuns] = await Promise.all([
+  const [state, usage, runs, cases, retrievalRuns, research] = await Promise.all([
     safeQuery<AiControlState>(() => getAiControlState({ organizationId }), EMPTY_STATE, { tag: "ai-engine.state" }),
     safeQuery<TenantAiUsage>(
       () => getTenantAiUsage({ organizationId, since: monthStart }),
@@ -58,6 +72,7 @@ export default async function AiEnginePage() {
     safeQuery(() => listEvalRuns({ organizationId, limit: 12 }), [], { tag: "ai-engine.evalRuns" }),
     safeQuery(() => listGoldenCases({ organizationId, limit: 50 }), [], { tag: "ai-engine.goldenCases" }),
     safeQuery(() => listRetrievalEvalRuns({ organizationId, limit: 8 }), [], { tag: "ai-engine.retrievalRuns" }),
+    safeQuery<ResearchState>(() => getResearchState({ organizationId }), EMPTY_RESEARCH, { tag: "ai-engine.research" }),
   ]);
 
   // BL-AIX Phase 1h-2 — expert ratings of the listed runs and the judge's calibration.
@@ -116,6 +131,23 @@ export default async function AiEnginePage() {
         routingOn={state.routingOn}
         isAdmin={isAdmin}
       />
+      <div className="mt-4">
+        <ResearchPanel
+          isAdmin={isAdmin}
+          hasSubscription={state.hasSubscription}
+          enabled={research.settings.enabled}
+          allowedDomains={research.settings.allowedDomains}
+          blockedDomains={research.settings.blockedDomains}
+          monthlyCap={research.settings.monthlyCap}
+          planAllowance={research.planAllowance}
+          cap={research.cap}
+          used={research.used}
+          remaining={research.remaining}
+          trialEnded={research.trialEnded}
+          providerReady={research.providerReady}
+          monthLabel={monthLabel}
+        />
+      </div>
       <div className="mt-4">
         <AIEngineTab status={aiStatus} />
       </div>
