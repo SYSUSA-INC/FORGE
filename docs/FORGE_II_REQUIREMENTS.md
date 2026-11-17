@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-17, after PR #507 and Phase 6c-2 (this PR).
+Last reviewed 2026-11-17, after PR #508 and Phase 6d-1 (this PR).
 
 ---
 
@@ -142,7 +142,7 @@ Last reviewed 2026-11-17, after PR #507 and Phase 6c-2 (this PR).
 | S-1 | Reviews **Pink, Red, Green, Gold and White Gloves** completed and **formally signed off** by everyone before submission | ✅ #504: the opportunity's Deliver tab shows each colour's sign-off and blocks a submission until all five are signed off; an org admin or the proposal manager may override with an audited reason |
 | S-2 | Option 1: generate a **PDF** the lead submits by email | ✅ #504: Deliver → Record submission keeps a copy of the file sent, with who, when, how and to whom |
 | S-3 | Option 2: **submit by email from the portal**, from an email address assigned to the portal | ✅ #505: Deliver → Send from FORGE emails the chosen files once, from the opportunity's own address on the inbound domain, with the sender copied. Real sends need that domain verified in Resend (owner). ✅ #506: extra uploaded files on a send, receipts on a submission, and download of the kept copy |
-| S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | ✅ #507: a reply to the opportunity's address is read from FORGE's Exchange mailbox through Microsoft Graph, filed on the opportunity (Deliver → Correspondence, the Activity timeline, the audit log) and announced to the proposal manager, the capture manager and the sender; delivery failures and automatic replies are recognised, an unknown or unverified sender is marked. 🔄 6c-2 (this PR): FORGE AI reads what a reply is (receipt, question, amendment, evaluation notice, award, unsuccessful), summarises it and picks out a date it names, as a suggestion that never changes the opportunity; an attachment can be filed as a document. 📋 6d: answering from the portal |
+| S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | ✅ #507: a reply to the opportunity's address is read from FORGE's Exchange mailbox through Microsoft Graph, filed on the opportunity (Deliver → Correspondence, the Activity timeline, the audit log) and announced to the proposal manager, the capture manager and the sender; delivery failures and automatic replies are recognised, an unknown or unverified sender is marked. ✅ #508: FORGE AI reads what a reply is (receipt, question, amendment, evaluation notice, award, unsuccessful), summarises it and picks out a date it names, as a suggestion that never changes the opportunity; an attachment can be filed as a document. 🔄 6d-1 (this PR): **Reply** on a filed message answers its sender from the opportunity's own address in the same thread, kept under Correspondence and in the audit log; an answer is not a submission (no sign-off, no stage change) |
 | S-5 | Submission through government portals: explore later | 📋 Recorded for later (owner) |
 | S-6 | Suggestions on how to do S-3 and S-4 | 📋 In phase 6's design: one sending domain, a reply address for each opportunity, and replies received in FORGE's Exchange mailbox and read through Microsoft Graph, as the bid inbox does (BL-SCOUT-INBOX; the owner chose Exchange over a separate mail service, 2026-11-06) |
 

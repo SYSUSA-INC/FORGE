@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { REPLY_NEXT_STEPS, replyTypeLabel, type ReplyType } from "@/lib/correspondence-logic";
+import { canAnswer, REPLY_NEXT_STEPS, replyTypeLabel, type ReplyType } from "@/lib/correspondence-logic";
 import { SUBMISSION_METHOD_LABELS } from "@/lib/deliver-logic";
 import type { DeliverView } from "@/lib/deliver-store";
 import { fileReplyAttachmentAction, readReplyAction } from "./actions";
+import { ReplyForm } from "./ReplyForm";
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 const kb = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`);
@@ -28,9 +29,11 @@ export function Correspondence({ view }: { view: DeliverView }) {
   const [open, setOpen] = useState<Record<string, { text: string; truncated: boolean }>>({});
   const [error, setError] = useState<string | null>(null);
   const [filed, setFiled] = useState<string | null>(null);
+  const [answering, setAnswering] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // A submission is listed once it has left; an answer from the first moment, so one that did not leave is seen here.
   const entries: Entry[] = [
-    ...view.submissions.filter((s) => s.sentAt).map((s) => ({ at: s.sentAt as string, kind: "sent" as const, submission: s })),
+    ...view.submissions.filter((s) => s.sentAt || s.inReplyToEmailId).map((s) => ({ at: s.sentAt ?? s.createdAt, kind: "sent" as const, submission: s })),
     ...view.replies.map((r) => ({ at: r.receivedAt, kind: "reply" as const, reply: r })),
   ].sort((a, b) => a.at.localeCompare(b.at));
 
@@ -64,12 +67,25 @@ export function Correspondence({ view }: { view: DeliverView }) {
           {entries.map((e) =>
             e.kind === "sent" ? (
               <li key={`s-${e.submission.id}`} className="flex flex-col gap-1 py-3">
-                <span className="font-mono text-[11px] uppercase tracking-widest text-muted">Sent · {when(e.at)}</span>
+                <span className="font-mono text-[11px] uppercase tracking-widest text-muted">
+                  {!e.submission.inReplyToEmailId ? "Sent" : e.submission.status === "sent" ? "Replied" : e.submission.status === "failed" ? "Reply not sent" : "Sending reply"} · {when(e.at)}
+                </span>
                 <span className="font-body text-[13px] text-text">{e.submission.subject || SUBMISSION_METHOD_LABELS[e.submission.method]}</span>
                 <span className="font-mono text-[11px] text-muted">
                   {e.submission.sentBy}
                   {e.submission.recipients.length > 0 ? ` to ${e.submission.recipients.join(", ")}` : ""}
+                  {e.submission.inReplyToEmailId && e.submission.cc.length > 0 ? ` · Cc ${e.submission.cc.join(", ")}` : ""}
                 </span>
+                {e.submission.inReplyToEmailId && e.submission.status === "failed" ? (
+                  <span role="alert" className="font-body text-[13px] text-red">Not sent: {e.submission.error || "the mail service gave no reason"}. Nothing left FORGE; reply again.</span>
+                ) : null}
+                {e.submission.inReplyToEmailId
+                  ? e.submission.files.map((f, i) => (
+                      <span key={`${i}-${f.fileName}`} className="font-mono text-[11px] text-muted">
+                        {f.kept ? <a href={`/api/opportunities/${view.opportunityId}/submissions/${e.submission.id}/file?i=${i}`} className="text-cobalt underline-offset-2 hover:underline">{f.fileName}</a> : f.fileName} · {kb(f.byteSize)}
+                      </span>
+                    ))
+                  : null}
               </li>
             ) : (
               <li key={`r-${e.reply.id}`} className="flex flex-col gap-1 py-3">
@@ -102,10 +118,21 @@ export function Correspondence({ view }: { view: DeliverView }) {
                     </button>
                   </span>
                 ))}
-                {open[e.reply.id] ? null : (
-                  <button type="button" className="aur-btn aur-btn-ghost mt-1 self-start" disabled={pending} onClick={() => read(e.reply.id)}>
-                    Open
-                  </button>
+                {answering === e.reply.id ? (
+                  <ReplyForm opportunityId={view.opportunityId} emailId={e.reply.id} to={e.reply.fromAddress} subject={e.reply.subject} senderEmail={view.send.senderEmail} onClose={() => setAnswering(null)} />
+                ) : (
+                  <span className="mt-1 flex flex-wrap gap-2">
+                    {open[e.reply.id] ? null : (
+                      <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => read(e.reply.id)}>
+                        Open
+                      </button>
+                    )}
+                    {view.canSubmit && view.send.configured && e.reply.read && canAnswer(e.reply.type) ? (
+                      <button type="button" className="aur-btn aur-btn-ghost" disabled={pending} onClick={() => setAnswering(e.reply.id)}>
+                        Reply
+                      </button>
+                    ) : null}
+                  </span>
                 )}
               </li>
             ),

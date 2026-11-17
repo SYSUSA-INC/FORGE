@@ -17,6 +17,7 @@ import {
   type SubmissionFile,
   uploadedFileName,
 } from "@/lib/deliver-logic";
+import { markReplied, replyThreadHeaders } from "@/lib/deliver-reply";
 import { auditGateOverride, markDelivered, rendersOf, sendConfigured, submissionContext, type DeliverUser } from "@/lib/deliver-store";
 import { EmailRefusedError, sendEmailTracked } from "@/lib/email";
 import { inboundDomain } from "@/lib/inbound-email-logic";
@@ -190,7 +191,7 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
       action: "proposal.submission.send_failed",
       resourceType: "proposal",
       resourceId: row.proposalId,
-      metadata: { submissionId: row.id, opportunityId: row.opportunityId, error: message },
+      metadata: { submissionId: row.id, opportunityId: row.opportunityId, error: message, ...(row.inReplyToEmailId ? { inReplyToEmailId: row.inReplyToEmailId } : {}) },
     });
     throw new JobPermanentError(message);
   };
@@ -219,7 +220,9 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
     files.push({ ...f, contentType: object!.contentType, byteSize: bytes.byteLength, sha256: createHash("sha256").update(bytes).digest("hex") });
     attachments.push({ filename: f.fileName, content: Buffer.from(bytes), contentType: object!.contentType });
   }
-  if (files.length === 0) await fail("The submission has no file.");
+  // 6d-1 — an answer to a reply (deliver-reply.ts) may carry no file; a submission always carries one.
+  if (files.length === 0 && !row.inReplyToEmailId) await fail("The submission has no file.");
+  const headers = row.inReplyToEmailId ? await replyThreadHeaders(organizationId, row.inReplyToEmailId) : undefined;
   if (files.reduce((n, f) => n + f.byteSize, 0) > SEND_MAX_BYTES) await fail(TOO_LARGE);
   await db.update(proposalSubmissions).set({ files, updatedAt: new Date() }).where(and(eq(proposalSubmissions.id, row.id), eq(proposalSubmissions.organizationId, organizationId)));
 
@@ -234,6 +237,7 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
       text: row.body,
       html: plainBodyHtml(row.body),
       attachments,
+      headers,
       idempotencyKey: `submission-send/${row.id}`,
     });
     // A stubbed send left nothing: never mark it sent.
@@ -254,6 +258,11 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
     .where(and(eq(proposalSubmissions.id, row.id), eq(proposalSubmissions.organizationId, organizationId), eq(proposalSubmissions.status, "sending")))
     .returning({ id: proposalSubmissions.id });
   if (landed.length === 0) return;
+  // An answer is filed as correspondence. It is not a submission: no stage moves and no event is raised.
+  if (row.inReplyToEmailId) {
+    await markReplied({ organizationId, opportunityId: row.opportunityId, submissionId: row.id, emailId: row.inReplyToEmailId, actor, recipients: row.recipientsTo, cc: row.recipientsCc, from: row.fromAddress, subject: row.subject, messageId, threaded: !!headers, files });
+    return;
+  }
   await markDelivered({
     organizationId,
     opportunityId: row.opportunityId,

@@ -197,3 +197,29 @@ export const REPLY_NEXT_STEPS: Partial<Record<ReplyType, { text: string; outcome
   unsuccessful: { text: "If this is right, record the outcome on the opportunity and ask for a debrief.", outcome: true },
   delivery_failure: { text: "The proposal may not have arrived. Check the address and send it again." },
 };
+
+/** The subject of an answer: the message's own, with one "RE:" in front. */
+export function replySubject(subject: string): string {
+  const s = subject.replace(/[\r\n]+/g, " ").trim();
+  if (!s) return "RE:";
+  return (/^re\s*:/i.test(s) ? s : `RE: ${s}`).slice(0, 200);
+}
+
+/**
+ * The headers that keep an answer in the thread of the message it
+ * answers: `In-Reply-To` and `References`, both that message's Internet
+ * Message-ID in angle brackets. Null when FORGE does not hold one (a
+ * message stored under the mail provider's own id): the answer is then
+ * sent without them and mail programs thread it by subject.
+ */
+export function threadHeaders(messageId: string): { "In-Reply-To": string; References: string } | null {
+  const bare = messageId.trim().replace(/^<|>$/g, "");
+  if (!/^[^<>\s@]+@[^<>\s@]+$/.test(bare)) return null;
+  const id = `<${bare}>`;
+  return { "In-Reply-To": id, References: id };
+}
+
+/** Whether a filed message can be answered from FORGE: a mail system's failure notice has no one to answer. */
+export function canAnswer(type: string): boolean {
+  return type !== "delivery_failure";
+}

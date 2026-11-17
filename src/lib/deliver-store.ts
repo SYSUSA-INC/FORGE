@@ -82,6 +82,9 @@ export type DeliverSubmission = {
   overrideReason: string;
   /** In stored order: the download route takes the position. `kept` once FORGE holds the bytes. */
   files: { kind: "proposal" | "extra" | "receipt"; fileName: string; byteSize: number; sha256: string; kept: boolean }[];
+  /** 6d-1 — set on an answer to a reply: the filed message it answers. Such a row is correspondence, not a submission. */
+  inReplyToEmailId: string | null;
+  createdAt: string;
 };
 
 export type DeliverView = {
@@ -210,6 +213,8 @@ export async function listSubmissions(organizationId: string, opportunityId: str
       note: proposalSubmissions.note,
       overrideReason: proposalSubmissions.overrideReason,
       files: proposalSubmissions.files,
+      inReplyToEmailId: proposalSubmissions.inReplyToEmailId,
+      createdAt: proposalSubmissions.createdAt,
       senderName: users.name,
       senderEmail: users.email,
     })
@@ -230,6 +235,8 @@ export async function listSubmissions(organizationId: string, opportunityId: str
     note: r.note,
     overrideReason: r.overrideReason,
     files: ((r.files ?? []) as SubmissionFile[]).map((f) => ({ kind: f.kind ?? "proposal", fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256, kept: f.sha256 !== "" })),
+    inReplyToEmailId: r.inReplyToEmailId,
+    createdAt: r.createdAt.toISOString(),
   }));
 }
 
@@ -529,11 +536,11 @@ export async function readSubmissionFile(i: { organizationId: string; opportunit
 export async function attachSubmissionReceipt(i: { organizationId: string; opportunityId: string; submissionId: string; user: DeliverUser; uploadId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   const { organizationId, opportunityId, submissionId, user } = i;
   const [row] = await db
-    .select({ id: proposalSubmissions.id, proposalId: proposalSubmissions.proposalId, status: proposalSubmissions.status, files: proposalSubmissions.files })
+    .select({ id: proposalSubmissions.id, proposalId: proposalSubmissions.proposalId, status: proposalSubmissions.status, files: proposalSubmissions.files, inReplyToEmailId: proposalSubmissions.inReplyToEmailId })
     .from(proposalSubmissions)
     .where(and(eq(proposalSubmissions.id, submissionId), eq(proposalSubmissions.organizationId, organizationId), eq(proposalSubmissions.opportunityId, opportunityId)))
     .limit(1);
-  if (!row) return { ok: false, error: "Submission not found." };
+  if (!row || row.inReplyToEmailId) return { ok: false, error: "Submission not found." };
   const [leads] = await db
     .select({ proposalManagerUserId: proposals.proposalManagerUserId, captureManagerUserId: proposals.captureManagerUserId })
     .from(proposals)

@@ -334,3 +334,12 @@ bid reader (`aiAutoDraft`, one request). *Record the outcome* is a
 link to the opportunity's page, where the close-out buttons are, shown
 for an award or an unsuccessful notice. File as a document is open to
 any member, files one attachment, and refuses the same file twice.
+
+**As built in 6d-1.** Reply is its own small form on the message, not
+the Send form: To is the message's stored sender and cannot be typed,
+there are no renders to choose, and no sign-off is asked. The row is
+told apart by `proposal_submission.in_reply_to_email_id` (migration
+0180); a row with it set never reaches `markDelivered`. `References`
+carries the one Message-ID FORGE holds (the message answered), not
+the whole chain. The answer does not quote the message. A delivery
+failure cannot be answered. Pipeline → Deliver moves to 6d-2.

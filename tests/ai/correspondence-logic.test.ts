@@ -19,6 +19,9 @@ import {
   replyDate,
   replyReadSchema,
   replySummary,
+  canAnswer,
+  replySubject,
+  threadHeaders,
   replyTypeLabel,
   senderIsRecipient,
 } from "@/lib/correspondence-logic";
@@ -143,5 +146,29 @@ describe("the AI reading (6c-2)", () => {
     expect(REPLY_NEXT_STEPS.question?.outcome).toBeUndefined();
     expect(REPLY_NEXT_STEPS.receipt).toBeUndefined();
     expect(REPLY_NEXT_STEPS.other).toBeUndefined();
+  });
+});
+
+describe("answering a reply (6d-1)", () => {
+  it("puts one RE: in front of the subject", () => {
+    expect(replySubject("Question on Volume II")).toBe("RE: Question on Volume II");
+    expect(replySubject("Re: Question")).toBe("Re: Question");
+    expect(replySubject("  RE : Question\r\nBcc: x@y.z ")).toBe("RE : Question Bcc: x@y.z");
+    expect(replySubject("")).toBe("RE:");
+    expect(replySubject("x".repeat(300))).toHaveLength(200);
+  });
+
+  it("builds thread headers only from an Internet Message-ID", () => {
+    expect(threadHeaders("<abc.123@mail.agency.gov>")).toEqual({ "In-Reply-To": "<abc.123@mail.agency.gov>", References: "<abc.123@mail.agency.gov>" });
+    expect(threadHeaders(" abc@agency.gov ")).toEqual({ "In-Reply-To": "<abc@agency.gov>", References: "<abc@agency.gov>" });
+    expect(threadHeaders("AAMkAGraphOwnId=")).toBeNull();
+    expect(threadHeaders("<a@b>\r\nBcc: x@y.z")).toBeNull();
+    expect(threadHeaders("")).toBeNull();
+  });
+
+  it("answers anything but a delivery failure", () => {
+    expect(canAnswer("question")).toBe(true);
+    expect(canAnswer("automatic_reply")).toBe(true);
+    expect(canAnswer("delivery_failure")).toBe(false);
   });
 });
