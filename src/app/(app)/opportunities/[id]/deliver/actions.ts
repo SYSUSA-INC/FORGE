@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { recordRead } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
+import { readReplyText } from "@/lib/correspondence";
 import { queueSubmissionSend, type SendSubmissionResult } from "@/lib/deliver-send";
 import { attachSubmissionReceipt, recordSubmission, type RecordSubmissionResult } from "@/lib/deliver-store";
 
@@ -109,4 +111,27 @@ export async function attachReceiptAction(input: { opportunityId: string; submis
   });
   if (res.ok) revalidatePath(`/opportunities/${opportunityId}/deliver`);
   return res;
+}
+
+/**
+ * BL-NAV-LIFECYCLE 6c (S-4) — open a reply filed to the opportunity: its
+ * full text, read from the tenant's storage. A read, so nothing is
+ * revalidated; it is audited (`opportunity.correspondence.read`).
+ */
+export async function readReplyAction(input: { opportunityId: string; emailId: string }): Promise<{ ok: true; text: string; truncated: boolean } | { ok: false; error: string }> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const opportunityId = String(input?.opportunityId ?? "");
+  const emailId = String(input?.emailId ?? "");
+  const found = await readReplyText({ organizationId, opportunityId, emailId });
+  if (!found) return { ok: false, error: "This message is no longer available." };
+  await recordRead({
+    organizationId,
+    actor: { userId: actor.id, email: actor.email },
+    action: "opportunity.correspondence.read",
+    resourceType: "opportunity",
+    resourceId: opportunityId,
+    metadata: { emailId, from: found.from },
+  });
+  return { ok: true, text: found.text, truncated: found.truncated };
 }

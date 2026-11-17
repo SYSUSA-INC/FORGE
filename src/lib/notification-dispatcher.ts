@@ -390,6 +390,7 @@ function legacyKindFor(kind: NotificationTriggerEventKind) {
     case "proposal_created":
     case "proposal_advanced":
     case "proposal_submitted":
+    case "submission_reply_received":
       return "review_assigned" as const;
     case "proposal_section_overdue":
       // BL-NAV-LIFECYCLE 4b-2 — its own inbox kind (drizzle/0163).

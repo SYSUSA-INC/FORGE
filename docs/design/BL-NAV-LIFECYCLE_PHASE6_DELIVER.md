@@ -313,3 +313,15 @@ record (sent or recorded), not inside the Record submission form, so a
 confirmation that arrives later can be kept too. Receipts and extra
 files stay at their upload's own key (no second copy); renders are
 copied as before. The download route always serves an attachment.
+
+**As built in 6c-1.** Routing, filing and the Correspondence list are
+in; the AI reading and File as a document move to 6c-2 for the diff
+cap. Until then the job types a reply from its headers alone (delivery
+failure, automatic reply, else "Reply") and summarises it with its own
+first two lines. Replies are routed by the `sub-` address only:
+`In-Reply-To` routing through the company's bid address is not built,
+because FORGE holds the provider's id, not the Message-ID header. The
+default notification rule is made the first time a tenant receives a
+reply, not seeded by a migration. A delivery failure is not marked
+"check the sender" for coming from a mail system the submission was
+not sent to. An attachment always downloads as plain bytes.

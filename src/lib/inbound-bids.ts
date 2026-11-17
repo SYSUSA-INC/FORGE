@@ -55,7 +55,8 @@ export async function readInboundEmail(input: { organizationId: string; emailId:
     .from(inboundEmails)
     .where(and(eq(inboundEmails.id, input.emailId), eq(inboundEmails.organizationId, organizationId)))
     .limit(1);
-  if (!email) return { ok: false, error: "Email not found." };
+  // A reply to a submission (BL-NAV-LIFECYCLE 6c) is read on its opportunity's Deliver tab, never for bids.
+  if (!email || email.kind === "proposal_reply") return { ok: false, error: "Email not found." };
   if (email.status === "parsed" && !input.force) return { ok: true, bids: email.bidsFound, created: 0 };
   const mark = (set: Partial<typeof inboundEmails.$inferInsert>) =>
     db.update(inboundEmails).set(set).where(and(eq(inboundEmails.id, email.id), eq(inboundEmails.organizationId, organizationId)));

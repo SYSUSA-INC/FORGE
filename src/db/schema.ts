@@ -487,6 +487,8 @@ export const opportunityActivityKindEnum = pgEnum("opportunity_activity_kind", [
   "owner_change",
   // BL-NAV-LIFECYCLE 6a — a proposal submission recorded on the Deliver tab (drizzle/0177).
   "submission",
+  // BL-NAV-LIFECYCLE 6c — a reply to a submission, filed from the opportunity's address (drizzle/0179).
+  "correspondence",
 ]);
 
 export const opportunityActivities = pgTable("opportunity_activity", {
@@ -2265,6 +2267,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "proposal_advanced",
     // BL-NAV-LIFECYCLE 6a — a submission recorded on the Deliver tab (drizzle/0177).
     "proposal_submitted",
+    // BL-NAV-LIFECYCLE 6c — a reply to a submission arrived at the opportunity's address (drizzle/0179).
+    "submission_reply_received",
     "proposal_section_overdue",
     "review_request_pending",
     "review_completed",
@@ -4948,6 +4952,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "proposal_research",
   // BL-NAV-LIFECYCLE 6b — a submission sent from the portal, once (drizzle/0178).
   "submission_send",
+  // BL-NAV-LIFECYCLE 6c — a reply to a submission, read and filed (drizzle/0179).
+  "submission_reply_parse",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [
@@ -5564,7 +5570,8 @@ export type NewFileUpload = typeof fileUploads.$inferInsert;
 // once per Internet Message-ID, the message and attachments in storage.
 // ─────────────────────────────────────────────────────────────────────
 
-export const inboundEmailKindEnum = pgEnum("inbound_email_kind", ["unknown", "bid_alert", "account", "other"]);
+// proposal_reply (BL-NAV-LIFECYCLE 6c, drizzle/0179): mail to an opportunity's own address, shown on its Deliver tab.
+export const inboundEmailKindEnum = pgEnum("inbound_email_kind", ["unknown", "bid_alert", "account", "other", "proposal_reply"]);
 export const inboundEmailStatusEnum = pgEnum("inbound_email_status", ["received", "parsed", "failed", "ignored"]);
 
 export const inboundAddresses = pgTable(
@@ -5619,11 +5626,21 @@ export const inboundEmails = pgTable(
     attachments: jsonb("attachments").$type<InboundAttachment[]>().notNull().default(sql`'[]'::jsonb`),
     bidsFound: integer("bids_found").notNull().default(0),
     error: text("error").notNull().default(""),
+    /** BL-NAV-LIFECYCLE 6c — a proposal_reply's opportunity and the submission it answers (drizzle/0179). */
+    opportunityId: uuid("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+    submissionId: uuid("submission_id").references(() => proposalSubmissions.id, { onDelete: "set null" }),
+    /** What the reply is (src/lib/correspondence-logic.ts REPLY_TYPES), two lines of it, and a date it names (YYYY-MM-DD). */
+    replyType: text("reply_type").notNull().default(""),
+    replySummary: text("reply_summary").notNull().default(""),
+    replyDate: text("reply_date").notNull().default(""),
+    /** The sender failed SPF and DKIM, or is not among the submission's recipients. */
+    checkSender: boolean("check_sender").notNull().default(false),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     orgReceivedIdx: index("inbound_email_org_received_idx").on(t.organizationId, t.receivedAt),
+    orgOpportunityIdx: index("inbound_email_org_opportunity_idx").on(t.organizationId, t.opportunityId, t.receivedAt),
     providerMsgUidx: uniqueIndex("inbound_email_provider_msg_uidx").on(t.organizationId, t.provider, t.providerMessageId),
   }),
 );
