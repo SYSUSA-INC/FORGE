@@ -33,6 +33,10 @@
       "version": "2026-10-05.1",
       "sha256": "c403ab03f596a74f89647c7d401c9780edc03b6424b275d916e6a8dfbdb07ce8"
     },
+    "delivery_reply": {
+      "version": "2026-11-17.1",
+      "sha256": "69c11481be95df059aa2e906177ba1387408360955b03ac3f8dbd8c032c1776d"
+    },
     "develop_research": {
       "version": "2026-11-16.1",
       "sha256": "4555b1a55a5f1b9e6e0d015d76ec00d20e6a0e9bb49ecab9df75dec4145d5d44"

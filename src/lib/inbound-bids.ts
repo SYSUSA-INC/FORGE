@@ -202,9 +202,11 @@ export async function handleInboundEmailParse(job: { organizationId: string; res
  * pipeline, the email's attachments go with it: each is filed as a
  * solicitation on the new opportunity and read like an upload. Ten files
  * at most; the plan's storage limit applies. Best effort: a file that
- * can't be filed is logged, never blocking the opportunity.
+ * can't be filed is logged, never blocking the opportunity. With
+ * `index` (BL-NAV-LIFECYCLE 6c-2, File as a document on a reply) only
+ * the attachment at that position is filed.
  */
-export async function fileInboundAttachments(input: { organizationId: string; emailId: string; opportunityId: string; userId: string | null }): Promise<number> {
+export async function fileInboundAttachments(input: { organizationId: string; emailId: string; opportunityId: string; userId: string | null; index?: number }): Promise<number> {
   const { organizationId } = input;
   const [email] = await db
     .select({ storagePath: inboundEmails.storagePath })
@@ -213,7 +215,7 @@ export async function fileInboundAttachments(input: { organizationId: string; em
     .limit(1);
   if (!email) return 0;
   const p = await loadPayload(organizationId, email.storagePath);
-  const files = (p?.attachments ?? []).filter((a) => a.storagePath.startsWith(`org/${organizationId}/inbound/`)).slice(0, 10);
+  const files = (input.index === undefined ? (p?.attachments ?? []) : (p?.attachments ?? []).slice(input.index, input.index + 1)).filter((a) => a.storagePath.startsWith(`org/${organizationId}/inbound/`)).slice(0, 10);
   const storage = getStorageProvider();
   let filed = 0;
   for (const a of files) {

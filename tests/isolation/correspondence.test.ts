@@ -8,22 +8,48 @@
  * notification rule) and changes no stage; a stranger or an unverified
  * sender is filed with the check-the-sender mark; bounces and automatic
  * replies are typed from headers; tenant B cannot list, open or download
- * tenant A's reply, and the bid inbox does not show it.
+ * tenant A's reply, and the bid inbox does not show it. 6c-2: a reply
+ * the headers do not explain is read by FORGE AI (type, summary, date)
+ * and still changes no stage; a bounce never reaches the model; with no
+ * plan, no quota or a failed call the reply is filed with the fallback
+ * and the request refunded; File as a document files one attachment on
+ * the opportunity once, and tenant B cannot file tenant A's.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 
-const mocks = vi.hoisted(() => ({ runDurable: vi.fn(async (..._args: unknown[]) => ({ jobId: "job", reused: false })) }));
-vi.mock("@/lib/jobs", () => ({ runDurable: mocks.runDurable }));
+const mocks = vi.hoisted(() => ({
+  runDurable: vi.fn(async (..._args: unknown[]) => ({ jobId: "job", reused: false })),
+  enqueueJob: vi.fn(async (..._args: unknown[]) => ({ job: { id: "job" }, reused: false })),
+  provider: { name: "stub" },
+  complete: vi.fn(async (..._args: unknown[]): Promise<{ data: unknown; parseError?: string }> => ({ data: null })),
+  ensureFeature: vi.fn(async (..._args: unknown[]) => undefined),
+  enforceQuota: vi.fn(async (..._args: unknown[]) => undefined),
+  refundQuota: vi.fn(async (..._args: unknown[]) => undefined),
+}));
+vi.mock("@/lib/jobs", () => ({ runDurable: mocks.runDurable, enqueueJob: mocks.enqueueJob }));
+vi.mock("@/lib/ai", async (original) => ({
+  ...(await original<typeof import("@/lib/ai")>()),
+  getAIProviderStatus: () => ({ active: { name: mocks.provider.name, configured: true } }),
+  completeStructuredForTenant: mocks.complete,
+}));
+vi.mock("@/lib/subscription-gates", async (original) => ({
+  ...(await original<typeof import("@/lib/subscription-gates")>()),
+  ensureFeature: mocks.ensureFeature,
+  enforceQuota: mocks.enforceQuota,
+  refundQuota: mocks.refundQuota,
+  enforceStorageQuota: async () => undefined,
+}));
 vi.mock("@/lib/background", () => ({ runInBackground: () => undefined }));
 
 import { db } from "@/db";
-import { auditLogs, inboundEmails, notificationRules, opportunities, opportunityActivities, proposalSubmissions, proposals } from "@/db/schema";
-import { handleSubmissionReply, listReplies, readReplyAttachment, readReplyText } from "@/lib/correspondence";
+import { auditLogs, inboundEmails, notificationRules, opportunities, opportunityActivities, proposalSubmissions, proposals, solicitations } from "@/db/schema";
+import { fileReplyAttachment, handleSubmissionReply, listReplies, readReplyAttachment, readReplyText } from "@/lib/correspondence";
 import { ensureDeliveryAddress } from "@/lib/deliver-send";
 import { readInboundEmail } from "@/lib/inbound-bids";
 import { listInboundEmails, receiveInboundMessage } from "@/lib/inbound-email";
+import { FeatureGateError } from "@/lib/subscription-gates";
 import { createTwoTenants, type TenantFixture, type TwoTenantFixture } from "../helpers/fixtures";
 
 const CO = "co@agency.gov";
@@ -64,7 +90,8 @@ describe("replies to a submission", () => {
 
   beforeEach(async () => {
     vi.stubEnv("INBOUND_EMAIL_DOMAIN", "bids.forgeaxi.test");
-    mocks.runDurable.mockClear();
+    for (const m of [mocks.runDurable, mocks.enqueueJob, mocks.complete, mocks.ensureFeature, mocks.enforceQuota, mocks.refundQuota]) m.mockClear();
+    mocks.provider.name = "stub";
     fx = await createTwoTenants("correspondence");
     address = (await ensureDeliveryAddress(fx.orgA.organizationId, fx.orgA.opportunityId))!;
     submissionId = await addSubmission(fx.orgA, [CO]);
@@ -167,5 +194,69 @@ describe("replies to a submission", () => {
 
     expect(await listInboundEmails(fx.orgA.organizationId)).toEqual([]);
     expect(await readInboundEmail({ organizationId: fx.orgA.organizationId, emailId: res.emailId, force: true })).toMatchObject({ ok: false });
+  });
+
+  it("reads a reply with FORGE AI, suggests and never acts, and falls back when there is no reading", async () => {
+    mocks.provider.name = "anthropic";
+    const run = async (o: Parameters<typeof receive>[1]) => {
+      const res = await receive(address, o);
+      if (res.status !== "stored") throw new Error("not stored");
+      await handleSubmissionReply({ organizationId: fx.orgA.organizationId, resourceId: res.emailId });
+      return emailRow(res.emailId);
+    };
+    const oppBefore = (await db.select({ stage: opportunities.stage }).from(opportunities).where(eq(opportunities.id, fx.orgA.opportunityId)))[0]!;
+
+    mocks.complete.mockResolvedValueOnce({ data: { type: "award", summary: "  The contract is\nawarded to Acme. ", date: "2026-12-01" } });
+    expect(await run({ subject: "Notice of award", text: "The contract is awarded to Acme. Kickoff 2026-12-01." })).toMatchObject({ status: "parsed", replyType: "award", replySummary: "The contract is awarded to Acme.", replyDate: "2026-12-01", checkSender: false });
+    expect(mocks.complete).toHaveBeenCalledTimes(1);
+    expect(mocks.complete.mock.calls[0]![0]).toMatchObject({ organizationId: fx.orgA.organizationId, feature: "delivery_reply", temperature: 0 });
+    expect(mocks.enforceQuota).toHaveBeenCalledWith(fx.orgA.organizationId, "aiRequestsPerMonth");
+    expect((await db.select({ stage: opportunities.stage }).from(opportunities).where(eq(opportunities.id, fx.orgA.opportunityId)))[0]).toEqual(oppBefore);
+    const [activity] = await db.select().from(opportunityActivities).where(and(eq(opportunityActivities.opportunityId, fx.orgA.opportunityId), eq(opportunityActivities.kind, "correspondence")));
+    expect(activity!.title).toBe("Award: Notice of award");
+    expect(activity!.metadata).toMatchObject({ type: "award", date: "2026-12-01", readByAi: true });
+
+    // A bounce is known from its headers: the model is never asked.
+    expect(await run({ from: "postmaster@agency.gov", subject: "Undeliverable: Proposal" })).toMatchObject({ replyType: "delivery_failure" });
+    expect(mocks.complete).toHaveBeenCalledTimes(1);
+
+    // The call fails: filed as a plain reply with its own first lines, the request refunded.
+    mocks.complete.mockRejectedValueOnce(new Error("overloaded"));
+    expect(await run({})).toMatchObject({ status: "parsed", replyType: "other", replySummary: "We received your proposal. Evaluation begins Monday.", replyDate: "" });
+    expect(mocks.refundQuota).toHaveBeenCalledTimes(1);
+
+    // An unusable answer is the same.
+    mocks.complete.mockResolvedValueOnce({ data: null, parseError: "bad tool input" });
+    expect(await run({})).toMatchObject({ status: "parsed", replyType: "other" });
+    expect(mocks.refundQuota).toHaveBeenCalledTimes(2);
+
+    // The plan has no AI: filed without a call.
+    mocks.ensureFeature.mockRejectedValueOnce(new FeatureGateError("aiAutoDraft", "Starter"));
+    expect(await run({})).toMatchObject({ status: "parsed", replyType: "other" });
+    expect(mocks.complete).toHaveBeenCalledTimes(3);
+  });
+
+  it("files one attachment as a document on the opportunity, once, and only for its tenant", async () => {
+    const bytes = new TextEncoder().encode("Amendment 0001 text");
+    const res = await receive(address, { files: [{ name: "Cover.txt", contentType: "text/plain", bytes: new TextEncoder().encode("cover") }, { name: "Amendment 0001.txt", contentType: "text/plain", bytes }] });
+    if (res.status !== "stored") throw new Error("not stored");
+    const a = { organizationId: fx.orgA.organizationId, opportunityId: fx.orgA.opportunityId, emailId: res.emailId, index: 1, actor: { userId: fx.orgA.userId } };
+
+    expect(await fileReplyAttachment({ ...a, organizationId: fx.orgB.organizationId, actor: { userId: fx.orgB.userId } })).toMatchObject({ ok: false });
+    expect(await fileReplyAttachment({ ...a, organizationId: fx.orgB.organizationId, opportunityId: fx.orgB.opportunityId, actor: { userId: fx.orgB.userId } })).toMatchObject({ ok: false });
+    expect(await fileReplyAttachment({ ...a, index: 5 })).toMatchObject({ ok: false });
+    expect(await db.select().from(solicitations).where(eq(solicitations.source, "portal-email"))).toHaveLength(0);
+
+    expect(await fileReplyAttachment(a)).toEqual({ ok: true, fileName: "Amendment 0001.txt" });
+    const rows = await db.select().from(solicitations).where(and(eq(solicitations.organizationId, fx.orgA.organizationId), eq(solicitations.opportunityId, fx.orgA.opportunityId), eq(solicitations.source, "portal-email")));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ fileName: "Amendment 0001.txt", fileSize: bytes.length, parseStatus: "uploaded", uploadedByUserId: fx.orgA.userId });
+    expect(rows[0]!.storagePath.startsWith(`org/${fx.orgA.organizationId}/solicitation/`)).toBe(true);
+    expect(mocks.enqueueJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueJob.mock.calls[0]![0]).toMatchObject({ organizationId: fx.orgA.organizationId, kind: "solicitation_parse", resourceId: rows[0]!.id });
+    expect(await db.select().from(auditLogs).where(and(eq(auditLogs.organizationId, fx.orgA.organizationId), eq(auditLogs.action, "opportunity.correspondence.filed")))).toHaveLength(1);
+
+    expect(await fileReplyAttachment(a)).toMatchObject({ ok: false, error: expect.stringContaining("already") });
+    expect(mocks.enqueueJob).toHaveBeenCalledTimes(1);
   });
 });

@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is in its own PR; 6c-2 (the AI reading of a reply, File as a document) is next, then 6d.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is merged as #507; 6c-2 (the AI reading of a reply, File as a document; no migration) is in its own PR; 6d (Reply from the portal, Pipeline → Deliver) is next.
 
 ---
 
@@ -4240,7 +4240,7 @@ Every requirement in the FORGE II document, with its status and phase:
    `tests/isolation/deliver-files.test.ts`. Not done: removing a
    receipt once attached.
 
-   **6c-1 shipped** (this PR, migration 0179; design §2.5 Routing and
+   **6c-1 shipped** (#507, migration 0179; design §2.5 Routing and
    Filing). `receiveInboundMessage` looks for an opportunity's own
    address first (`routeReply` in `src/lib/correspondence.ts`: a
    `sub-` local part matched to `opportunity.delivery_local_part`, the
@@ -4271,6 +4271,29 @@ Every requirement in the FORGE II document, with its status and phase:
    evaluation notice, award, unsuccessful; a date named; "Record the
    outcome" as a suggestion) and **File as a document** on an
    attachment (`fileInboundAttachments`).
+
+   **6c-2 shipped** (this PR, no migration; design §2.5 Reading).
+   The reply job asks FORGE AI what a reply is unless its headers
+   already say (a delivery failure or an automatic reply never reaches
+   the model): feature `delivery_reply` (fast class, prompt version
+   `2026-11-17.1`, `buildReplyPrompt` and `replyReadSchema` in
+   `correspondence-logic.ts`), gated and metered as the bid reader is
+   (`aiAutoDraft`, one `aiRequestsPerMonth`, refunded when the call
+   fails). It writes the type, a two-line summary and a date the
+   message names (`reply_date`, kept only when it is a real day). No
+   AI on the deployment, no plan, no quota, a failed call or an
+   unusable answer: the reply is filed as before with the 6c-1
+   fallback, never held. The reading is a suggestion: the list shows
+   *Suggested: …* per type and, for an award or an unsuccessful
+   notice, a **Record the outcome** link to the opportunity; nothing
+   changes a stage (tested). **File as a document** on an attachment
+   (`fileReplyAttachment`, any member) files that one attachment as a
+   solicitation on the opportunity through `fileInboundAttachments`
+   (new `index` argument) and queues `solicitation_parse`; the same
+   file is not filed twice; audit `opportunity.correspondence.filed`.
+   Known limits: a reply filed before this PR keeps its header-only
+   type (no re-read button); the model is asked once, with no retry.
+   **6d next:** Reply from the portal and Pipeline → Deliver.
 
 ---
 

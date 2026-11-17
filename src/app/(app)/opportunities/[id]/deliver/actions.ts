@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { recordRead } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { readReplyText } from "@/lib/correspondence";
+import { fileReplyAttachment, readReplyText, type FileReplyResult } from "@/lib/correspondence";
 import { queueSubmissionSend, type SendSubmissionResult } from "@/lib/deliver-send";
 import { attachSubmissionReceipt, recordSubmission, type RecordSubmissionResult } from "@/lib/deliver-store";
 
@@ -134,4 +134,26 @@ export async function readReplyAction(input: { opportunityId: string; emailId: s
     metadata: { emailId, from: found.from },
   });
   return { ok: true, text: found.text, truncated: found.truncated };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 6c-2 (S-4) — File as a document: one attachment of a
+ * reply (an amendment, a revised form) becomes a solicitation file on
+ * the opportunity and is read like an upload. The file is already in
+ * the tenant's storage, named by its position in the message; nothing
+ * is uploaded here. `fileReplyAttachment` audits
+ * `opportunity.correspondence.filed`.
+ */
+export async function fileReplyAttachmentAction(input: { opportunityId: string; emailId: string; index: number }): Promise<FileReplyResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const opportunityId = String(input?.opportunityId ?? "");
+  const index = Number(input?.index);
+  if (!Number.isInteger(index) || index < 0) return { ok: false, error: "This attachment is no longer available." };
+  const res = await fileReplyAttachment({ organizationId, opportunityId, emailId: String(input?.emailId ?? ""), index, actor: { userId: actor.id, email: actor.email } });
+  if (!res.ok) return res;
+  revalidatePath("/");
+  revalidatePath(`/opportunities/${opportunityId}`);
+  revalidatePath(`/opportunities/${opportunityId}/deliver`);
+  return res;
 }

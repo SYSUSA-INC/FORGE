@@ -325,3 +325,12 @@ default notification rule is made the first time a tenant receives a
 reply, not seeded by a migration. A delivery failure is not marked
 "check the sender" for coming from a mail system the submission was
 not sent to. An attachment always downloads as plain bytes.
+
+**As built in 6c-2.** The model is asked once per reply and never for
+one the headers explain; any failure (no plan, no quota, an error, an
+unusable answer) files the reply with the 6c-1 fallback, so a reply is
+never held waiting for AI. The reading uses the gate and quota of the
+bid reader (`aiAutoDraft`, one request). *Record the outcome* is a
+link to the opportunity's page, where the close-out buttons are, shown
+for an award or an unsuccessful notice. File as a document is open to
+any member, files one attachment, and refuses the same file twice.

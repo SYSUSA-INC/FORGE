@@ -86,6 +86,7 @@ import { buildLossNarrativePrompt, lossNarrativeSchema } from "@/lib/ai-prompts-
 import { buildPartnerRankPrompt, partnerRankSchema } from "@/lib/partner-rank-logic";
 import { buildCharterPrompt, charterDraftSchema } from "@/lib/plan-charter-logic";
 import { buildPartnerRatePrompt, partnerRateSchema, scorePartners } from "@/lib/partner-compare-logic";
+import { buildReplyPrompt, replyReadSchema } from "@/lib/correspondence-logic";
 import { buildInboundBidsPrompt, inboundBidsSchema } from "@/lib/inbound-bids-logic";
 import { buildCapabilityQuestionsPrompt } from "@/lib/capability-matrix-prompt";
 import { draftedQuestionSchema } from "@/lib/capability-matrix-types";
@@ -351,6 +352,7 @@ export const PROMPT_RENDERERS: Record<PromptedFeature, () => RenderedPrompt[]> =
     }),
   ],
   inbound_bids: () => [buildInboundBidsPrompt({ from: "noreply@eva.virginia.gov", subject: "New Solicitation: IT Help Desk (RFP 26-001)", text: RFP_TEXT, links: ["https://eva.virginia.gov/bid/26-001"] })],
+  delivery_reply: () => [buildReplyPrompt({ from: "co@agency.gov", subject: "RE: Proposal for RFP 26-001", text: "We received your proposal. Please confirm your CAGE code by 2026-12-01.", sentSubject: "RFP 26-001 Proposal, Acme" })],
   image_ocr: () => [buildImageOcrPrompt()],
   knowledge_classify: () => [buildArtifactKindClassifyPrompt({ fileName: "DHS-migration.pdf", contentType: "application/pdf", rawText: "Past performance: DHS migration." })],
   knowledge_extract: () => [
@@ -625,6 +627,7 @@ export const PROMPT_SCHEMAS: Record<PromptedFeature, z.ZodType[]> = {
   gsa_extract: [gsaExtractionSchema],
   analysis_report: [analysisReportSchema],
   inbound_bids: [inboundBidsSchema],
+  delivery_reply: [replyReadSchema],
   image_ocr: [],
   knowledge_classify: [artifactKindClassifySchema],
   knowledge_extract: [knowledgeExtractionSchema],
