@@ -5,7 +5,8 @@ import { REVIEW_COLORS } from "@/lib/review-types";
 import { loadDraftRetention, type DraftRetention } from "@/lib/draft-learning";
 import { reviewerDecisionStats, type ReviewerDecisionStat } from "@/lib/draft-learning-logic";
 import { db } from "@/db";
-import { sectionChangeDecisions, sectionDraftSignals } from "@/db/schema";
+import { proposalSections, proposals, sectionChangeDecisions, sectionDraftSignals } from "@/db/schema";
+import { listStyleNotes, type StoredStyleNote } from "@/lib/style-note";
 import { aiSuggestionAcceptance } from "@/lib/ai-acceptance";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { FORGE_AI_AUTHOR } from "@/lib/tracked-diff";
@@ -45,6 +46,8 @@ export type DraftInsights = {
   retention: DraftRetention;
   /** BL-NAV-LIFECYCLE 5d — what happened to the colour-team reviewers' suggestions, per colour. */
   reviewerDecisions: ReviewerDecisionStat[];
+  /** BL-NAV-LIFECYCLE 5d-2 — the organization's style notes for the kinds of section this proposal has. */
+  styleNotes: StoredStyleNote[];
 };
 
 export async function getDraftInsightsAction(
@@ -172,6 +175,14 @@ export async function getDraftInsightsAction(
     );
     const retention = await loadDraftRetention({ organizationId, proposalId });
 
+    // BL-NAV-LIFECYCLE 5d-2 — the style notes for this proposal's section kinds.
+    const sectionKindRows = await db
+      .selectDistinct({ kind: proposalSections.kind })
+      .from(proposalSections)
+      .innerJoin(proposals, eq(proposals.id, proposalSections.proposalId))
+      .where(and(eq(proposalSections.proposalId, proposalId), eq(proposals.organizationId, organizationId)));
+    const styleNotes = await listStyleNotes({ organizationId, sectionKinds: sectionKindRows.map((r) => r.kind) });
+
     const tally = (type: string, decision: string) =>
       Number(decisionRows.find((r) => r.changeType === type && r.decision === decision)?.n ?? 0);
     const insertsTotal = tally("insert", "accept") + tally("insert", "reject");
@@ -204,6 +215,7 @@ export async function getDraftInsightsAction(
         editDecisions,
         retention,
         reviewerDecisions,
+        styleNotes,
       },
     };
   } catch (err) {

@@ -23,6 +23,7 @@
  */
 
 import { aiSuggestionAcceptance } from "@/lib/ai-acceptance";
+import type { StyleNoteView } from "@/lib/style-note-logic";
 
 export type EditDecisionInput = {
   changeType: "insert" | "delete";
@@ -52,6 +53,12 @@ export type EditFeedbackSummary = {
   aiSuggestionAcceptRate: number | null;
   /** FORGE AI suggestions decided in the sample. */
   aiDecisions: number;
+  /**
+   * BL-NAV-LIFECYCLE 5d-2 — the tenant's weekly style note for this section
+   * kind (src/lib/style-note.ts), when one exists. Added by the loader, not
+   * by `summarizeEditDecisions`.
+   */
+  styleNote?: StyleNoteView | null;
 };
 
 /** Below this many decisions the signal is noise; callers get null. */

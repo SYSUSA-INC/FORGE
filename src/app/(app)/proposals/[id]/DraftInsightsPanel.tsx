@@ -13,6 +13,35 @@ const KIND_LABELS: Record<string, string> = {
   compliance: "Compliance",
 };
 
+const KIND_NAMES: Record<string, string> = {
+  executive_summary: "Executive summary",
+  technical: "Technical",
+  management: "Management",
+  past_performance: "Past performance",
+  pricing: "Pricing",
+  compliance: "Compliance",
+};
+
+function StyleList({ label, items, quoted }: { label: string; items: string[]; quoted?: boolean }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-[10px] uppercase tracking-label text-subtle">{label}</span>
+      {quoted ? (
+        <ul className="flex flex-col gap-0.5">
+          {items.map((item) => (
+            <li key={item} className="font-body text-[11px] leading-relaxed text-muted">
+              &ldquo;{item}&rdquo;
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="font-body text-[11px] leading-relaxed text-muted">{items.join(" · ")}</p>
+      )}
+    </div>
+  );
+}
+
 function colorLabel(color: string): string {
   return REVIEW_COLOR_LABELS[color as ReviewColor] ?? color;
 }
@@ -48,7 +77,8 @@ export async function DraftInsightsPanel({
       result.data.editDecisions.total === 0 &&
       result.data.editDecisions.aiDecisions === 0 &&
       result.data.retention.now === null &&
-      result.data.retention.reviews.length === 0)
+      result.data.retention.reviews.length === 0 &&
+      result.data.styleNotes.length === 0)
   ) {
     return null;
   }
@@ -161,6 +191,39 @@ export async function DraftInsightsPanel({
                 </li>
               ))}
             </ul>
+          </div>
+        ) : null}
+
+        {/* BL-NAV-LIFECYCLE 5d-2 — the organization's style notes */}
+        {data.styleNotes.length > 0 ? (
+          <div className="flex flex-col gap-2 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <span className="font-body text-[12px] text-muted">How your team writes</span>
+            {data.styleNotes.map((note) => (
+              <details key={note.sectionKind} className="border-t border-layer/10 pt-1.5">
+                <summary className="flex cursor-pointer items-center justify-between gap-2 font-mono text-[10px] text-muted">
+                  <span>{KIND_NAMES[note.sectionKind] ?? note.sectionKind}</span>
+                  <span className="text-subtle">
+                    {note.body.sampleSize} edits
+                    {note.body.reviewerDecisions > 0 ? ` · ${note.body.reviewerDecisions} from reviewers` : ""}
+                    {` · ${new Date(note.builtAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                  </span>
+                </summary>
+                <div className="mt-1.5 flex flex-col gap-1.5">
+                  <StyleList label="Wording preferred" items={note.body.preferredWording} />
+                  <StyleList label="Wording cut" items={note.body.avoidedWording} />
+                  <StyleList label="Added and kept" items={note.body.added.slice(0, 3)} quoted />
+                  <StyleList label="Cut" items={note.body.cut.slice(0, 3)} quoted />
+                  <StyleList label="Dropped from AI drafts" items={note.body.droppedFromAiDrafts.slice(0, 3)} quoted />
+                </div>
+              </details>
+            ))}
+            <p className="font-body text-[11px] leading-relaxed text-subtle">
+              Rebuilt every week from your organization&apos;s own tracked
+              changes and reviewers&apos; suggestions over the last 180 days,
+              one note per kind of section, once a kind has five decisions.
+              The drafter reads the note for the kind of section it is
+              writing. It is never shared with another organization.
+            </p>
           </div>
         ) : null}
 
