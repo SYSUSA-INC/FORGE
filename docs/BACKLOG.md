@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) is merged; 5b-1b (the research job and draft-all wiring, migration 0172) is in its own PR; then 5b-2 (prepaid search packs), and 5d comes last.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs) has its design for review in `docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md` (six owner decisions, each with a recommendation); it is built in two PRs (5b-2a credits and the draw, 5b-2b Checkout and the webhook) once the owner answers. 5d comes last.
 
 ---
 
