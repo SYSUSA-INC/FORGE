@@ -116,7 +116,10 @@ reports the kept share through each review.
    (migration 0175) the `ai_draft` snapshot (a snapshot `kind`, written
    by Auto-draft), the round and colour on a reviewer's
    `section_change_decision`, and the kept share measured when each
-   round starts (`section_draft_retention`); **5d-2** the style note.
+   round starts (`section_draft_retention`); **5d-2** (migration 0176)
+   the style note (`section_style_note`), computed weekly from the
+   tenant's edits with no AI call, read through `edit-feedback.ts` and
+   shown on the panel.
 
 ## 4. Decisions for the owner
 

@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review; migration 0175) is in its own PR; 5d-2 (the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) follows.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is in its own PR and completes phase 5. Phase 6 (Deliver) is next and starts with its design.
 
 ---
 
@@ -4113,7 +4113,7 @@ Every requirement in the FORGE II document, with its status and phase:
    Tests: `tests/stripe/search-pack.test.ts`,
    `tests/ai/search-pack-logic.test.ts`.
 
-   **5d-1 shipped** (this PR, migration 0175; design §2.5, additions 1
+   **5d-1 shipped** (#501, migration 0175; design §2.5, additions 1
    and 2, and D-8's measure). (1) Auto-draft keeps the text it wrote as
    a `proposal_section_snapshot` of kind `ai_draft` ("AI draft" in the
    Snapshots sidebar; it can be compared and restored, not deleted).
@@ -4132,8 +4132,34 @@ Every requirement in the FORGE II document, with its status and phase:
    nothing of tenant A's). Not done here: an `ai_draft` snapshot for a
    draft made with the editor's Draft button (its text is already in
    `section_draft_signal`; a discarded draft would clutter Snapshots);
-   the measure is taken when a round starts, not when it closes. 5d-2
-   (the style note, its weekly rebuild and its panel) follows.
+   the measure is taken when a round starts, not when it closes.
+
+   **5d-2 shipped** (this PR, migration 0176; design §2.5, addition 3).
+   `section_style_note`: one row per (tenant, section kind), built by
+   `buildStyleNote` (`src/lib/style-note-logic.ts`, pure, no AI call)
+   from the tenant's own tracked-change decisions of the last 180 days
+   (300 newest per kind) and its `ai_draft` snapshots: passages **cut**,
+   text **added** and kept (reviewers' suggestions first), **wording
+   preferred** and **wording cut** (words and pairs that recur on one
+   side and never on the other), and the AI's sentences **dropped**
+   from the text. FORGE AI's accepted text and accept-all never count
+   as the team's wording. `/api/cron/style-notes` (Mondays 08:23 UTC,
+   `CRON_SECRET`) rebuilds every enabled tenant with decisions in the
+   window (`runStyleNoteCron`, 200 tenants per run inside a time
+   budget, least recently rebuilt first); a kind under five decisions
+   gets no note and loses the one it had; audit `style_note.rebuild`.
+   `gatherEditFeedbackForSection` adds the note for the section's kind
+   as `editFeedback.styleNote` (same minimum of five; withheld from a
+   golden-eval case); `section_draft` prompt version 2026-11-17.1. The
+   AI Draft Insights panel gains **How your team writes**. Tests:
+   `tests/ai/style-note.test.ts`, `tests/isolation/style-note.test.ts`
+   (tenant B never reads tenant A's note). Decision taken here: the
+   note is computed, not written by a model, so a weekly rebuild
+   spends none of the tenant's AI requests and cannot invent a
+   preference; a model-written summary of the same inputs can be added
+   later if the owner wants prose. Not done: a "rebuild now" button
+   (the first notes appear after the first Monday run, or when the
+   cron is called once by hand). **Phase 5 is complete.**
 
 ---
 

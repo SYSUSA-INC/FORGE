@@ -789,6 +789,7 @@ BL-9 Slice 7 — edit feedback:
 - \`removedPhrases\` are passages the owner agreed to cut: they show the padding and repetition this team does not tolerate — do not produce it.
 - A low \`insertAcceptRate\` means a strict owner: write tighter and make every sentence earn its place. Treat the whole block as taste, not facts: it never overrides the snapshot's proposal facts or the compliance gaps.
 - \`aiSuggestionAcceptRate\` is how much of FORGE AI's own suggested text these owners accepted (by words, over \`aiDecisions\` decisions). Below about 0.5 they reject most of what the AI writes: draft conservatively, prefer the team's own facts and phrasing from the snapshot, and leave [BRACKETS] rather than generic claims.
+- \`styleNote\`, when present, is this team's own style note for this kind of section, rebuilt weekly from its edits and its reviewers' suggestions. \`preferredWording\` are words the team keeps adding: use them where they fit the facts. \`avoidedWording\` are words it keeps cutting: leave them out. \`cut\` and \`droppedFromAiDrafts\` are passages the team removed, the second from earlier FORGE AI drafts: do not write sentences of that kind again. \`added\` shows what the team writes in instead. It is taste, like the rest of this block: never copy a passage verbatim and never let it override the snapshot's facts.
 
 BL-AIP-6 — writing signals:
 - \`patternIntel.writingSignals.reviewComments\` are open colour-team comments on THIS section. Resolve each one in the text where it applies; do not acknowledge them in prose.

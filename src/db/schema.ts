@@ -1555,6 +1555,29 @@ export const sectionDraftRetentions = pgTable(
   }),
 );
 
+/**
+ * BL-NAV-LIFECYCLE 5d-2 — a tenant's style note for one section kind
+ * (drizzle/0176): what its writers and reviewers cut, add and prefer,
+ * rebuilt weekly from the tenant's own edits by `runStyleNoteCron`
+ * (src/lib/style-note.ts). `body` is a `StyleNoteBody`
+ * (src/lib/style-note-logic.ts). Never read across tenants.
+ */
+export const sectionStyleNotes = pgTable(
+  "section_style_note",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    sectionKind: text("section_kind").notNull(),
+    body: jsonb("body").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    sampleSize: integer("sample_size").notNull().default(0),
+    builtAt: timestamp("built_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ name: "section_style_note_pk", columns: [t.organizationId, t.sectionKind] }),
+  }),
+);
+
 export type TipTapDoc = {
   type: "doc";
   content: TipTapNode[];

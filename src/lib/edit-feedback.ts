@@ -7,6 +7,11 @@
  * has too few rows it falls back to the org's decisions across kinds.
  * Best-effort: any failure returns null and the draft proceeds without
  * this signal, like every other pattern-intel input.
+ *
+ * BL-NAV-LIFECYCLE 5d-2 — with enough decisions (the same minimum of
+ * five), the tenant's weekly style note for the section kind rides along
+ * as `styleNote`. A golden-eval case gets none: the stored note cannot
+ * leave out the case's own proposal.
  */
 import "server-only";
 
@@ -20,6 +25,7 @@ import {
   type EditFeedbackSummary,
 } from "@/lib/edit-feedback-summary";
 import { log } from "@/lib/log";
+import { getStyleNoteView } from "@/lib/style-note";
 import { isAiAuthor } from "@/lib/tracked-diff";
 
 const WINDOW_DAYS = 180;
@@ -46,7 +52,10 @@ export async function gatherEditFeedbackForSection(input: {
         ? byKind
         : await loadDecisions({ organizationId: input.organizationId, since, excludeProposalId: input.excludeProposalId });
     if (rows.length < EDIT_FEEDBACK_MIN_SAMPLE) return null;
-    return summarizeEditDecisions(rows, { windowDays: WINDOW_DAYS });
+    const summary = summarizeEditDecisions(rows, { windowDays: WINDOW_DAYS });
+    if (!summary || input.excludeProposalId) return summary;
+    const styleNote = await getStyleNoteView({ organizationId: input.organizationId, sectionKind: input.sectionKind });
+    return styleNote ? { ...summary, styleNote } : summary;
   } catch (err) {
     log.warn("[edit-feedback]", "decision load failed", { error: err });
     return null;
