@@ -2,24 +2,30 @@ import "server-only";
 
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { inboundEmails, notificationRules, opportunities, opportunityActivities, proposalSubmissions, proposals } from "@/db/schema";
+import { inboundEmails, notificationRules, opportunities, opportunityActivities, proposalSubmissions, proposals, solicitations } from "@/db/schema";
+import { completeStructuredForTenant, getAIProviderStatus } from "@/lib/ai";
 import { recordAudit } from "@/lib/audit-log";
 import {
+  buildReplyPrompt,
+  cleanReplyRead,
   headerReplyType,
   isReplyLocalPart,
   needsSenderCheck,
   pickSubmission,
   REPLY_TEXT_MAX,
+  replyReadSchema,
   replySummary,
   replyTypeLabel,
   senderIsRecipient,
   type ReplyType,
 } from "@/lib/correspondence-logic";
+import { fileInboundAttachments } from "@/lib/inbound-bids";
 import { companyLocalPart, emailText, inboundMessageSchema, type InboundMessage } from "@/lib/inbound-email-logic";
 import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { getStorageProvider } from "@/lib/storage";
+import { enforceQuota, ensureFeature, FeatureGateError, QuotaExceededError, refundQuota } from "@/lib/subscription-gates";
 
 /**
  * BL-NAV-LIFECYCLE 6c (FORGE II S-4) — replies to a submission, server
@@ -101,9 +107,50 @@ async function ensureReplyDefaultRule(organizationId: string): Promise<void> {
 }
 
 /**
+ * FORGE AI's reading of a reply (feature `delivery_reply`, metered as
+ * one AI request): its type, a two-line summary and a date it names.
+ * Null when there is no reading to use: no AI on this deployment, the
+ * plan does not include it or its quota is spent, or the call failed.
+ * A reply is always filed, so none of these stops the job.
+ */
+async function aiReplyRead(i: { organizationId: string; emailId: string; from: string; subject: string; text: string; sentSubject: string }) {
+  const { organizationId } = i;
+  if (i.text.trim() === "" || getAIProviderStatus().active.name === "stub") return null;
+  try {
+    await ensureFeature(organizationId, "aiAutoDraft");
+    await enforceQuota(organizationId, "aiRequestsPerMonth");
+  } catch (err) {
+    if (err instanceof FeatureGateError || err instanceof QuotaExceededError) return null;
+    throw err;
+  }
+  try {
+    const prompt = buildReplyPrompt(i);
+    const ai = await completeStructuredForTenant({
+      organizationId,
+      feature: "delivery_reply",
+      schema: replyReadSchema,
+      toolName: "record_reply",
+      toolDescription: "Record what the email is, a short summary and a date it names.",
+      system: prompt.system,
+      messages: prompt.messages,
+      maxTokens: 600,
+      temperature: 0,
+      cacheSystem: true,
+    });
+    if (ai.data) return cleanReplyRead(ai.data);
+    log.warn("[correspondence]", "the AI's reading could not be used", { organizationId, emailId: i.emailId, error: String(ai.parseError ?? "no data").slice(0, 300) });
+  } catch (err) {
+    log.warn("[correspondence]", "the AI's reading failed", { organizationId, emailId: i.emailId, error: err });
+  }
+  await refundQuota(organizationId, "aiRequestsPerMonth").catch(() => undefined);
+  return null;
+}
+
+/**
  * The `submission_reply_parse` job: read one reply and file it, once.
- * The type comes from the headers (a delivery failure, an automatic
- * reply) or is a plain reply; the summary is the reply's own first two
+ * A delivery failure or an automatic reply is known from the headers
+ * and never sent to the model; anything else is read by FORGE AI, and
+ * without a reading it is a plain reply summarised by its own first two
  * lines. The row moves from received to parsed in one conditional
  * update, so a second run of the job files nothing twice.
  */
@@ -118,20 +165,24 @@ export async function handleSubmissionReply(job: { organizationId: string; resou
   const opportunityId = email.opportunityId;
   const [submission] = email.submissionId
     ? await db
-        .select({ id: proposalSubmissions.id, proposalId: proposalSubmissions.proposalId, to: proposalSubmissions.recipientsTo, cc: proposalSubmissions.recipientsCc, sentByUserId: proposalSubmissions.sentByUserId })
+        .select({ id: proposalSubmissions.id, proposalId: proposalSubmissions.proposalId, subject: proposalSubmissions.subject, to: proposalSubmissions.recipientsTo, cc: proposalSubmissions.recipientsCc, sentByUserId: proposalSubmissions.sentByUserId })
         .from(proposalSubmissions)
         .where(and(eq(proposalSubmissions.id, email.submissionId), eq(proposalSubmissions.organizationId, organizationId)))
         .limit(1)
     : [];
   const payload = await loadReply(organizationId, email.storagePath);
-  const type: ReplyType = headerReplyType({ headers: payload?.headers ?? [], from: email.fromAddress, subject: email.subject }) ?? "other";
-  const summary = replySummary(payload ? emailText(payload) : email.textPreview);
+  const text = payload ? emailText(payload) : email.textPreview;
+  const fromHeaders = headerReplyType({ headers: payload?.headers ?? [], from: email.fromAddress, subject: email.subject });
+  const ai = fromHeaders ? null : await aiReplyRead({ organizationId, emailId: email.id, from: email.fromAddress, subject: email.subject, text, sentSubject: submission?.subject ?? "" });
+  const type: ReplyType = fromHeaders ?? ai?.type ?? "other";
+  const summary = ai?.summary || replySummary(text);
+  const date = ai?.date ?? "";
   const knownSender = senderIsRecipient(email.fromAddress, submission ? { to: submission.to ?? [], cc: submission.cc ?? [] } : null);
   const checkSender = needsSenderCheck({ authenticated: email.authenticated, knownSender, type });
 
   const claimed = await db
     .update(inboundEmails)
-    .set({ status: "parsed", replyType: type, replySummary: summary, checkSender, error: "" })
+    .set({ status: "parsed", replyType: type, replySummary: summary, replyDate: date, checkSender, error: "" })
     .where(and(eq(inboundEmails.id, email.id), eq(inboundEmails.organizationId, organizationId), eq(inboundEmails.status, "received")))
     .returning({ id: inboundEmails.id });
   if (claimed.length === 0) return;
@@ -145,7 +196,7 @@ export async function handleSubmissionReply(job: { organizationId: string; resou
     kind: "correspondence",
     title: `${label}: ${subject}`.slice(0, 300),
     body: [`From ${sender}${checkSender ? " (check the sender)" : ""}`, summary].filter(Boolean).join("\n"),
-    metadata: { emailId: email.id, submissionId: submission?.id ?? null, type, from: email.fromAddress, checkSender, attachments: (email.attachments ?? []).length },
+    metadata: { emailId: email.id, submissionId: submission?.id ?? null, type, date, from: email.fromAddress, checkSender, readByAi: !!ai, attachments: (email.attachments ?? []).length },
   });
   await recordAudit({
     organizationId,
@@ -153,7 +204,7 @@ export async function handleSubmissionReply(job: { organizationId: string; resou
     action: "opportunity.correspondence.received",
     resourceType: "opportunity",
     resourceId: opportunityId,
-    metadata: { emailId: email.id, submissionId: submission?.id ?? null, type, from: email.fromAddress, authenticated: email.authenticated, knownSender, checkSender },
+    metadata: { emailId: email.id, submissionId: submission?.id ?? null, type, date, readByAi: !!ai, from: email.fromAddress, authenticated: email.authenticated, knownSender, checkSender },
   }).catch((err) => log.warn("[correspondence]", "audit failed", { organizationId, error: err }));
 
   try {
@@ -196,6 +247,8 @@ export type DeliverReply = {
   read: boolean;
   type: string;
   summary: string;
+  /** A date the reply names (YYYY-MM-DD), or "". */
+  date: string;
   checkSender: boolean;
   attachments: { name: string; size: number }[];
 };
@@ -213,6 +266,7 @@ export async function listReplies(organizationId: string, opportunityId: string)
       status: inboundEmails.status,
       replyType: inboundEmails.replyType,
       replySummary: inboundEmails.replySummary,
+      replyDate: inboundEmails.replyDate,
       checkSender: inboundEmails.checkSender,
       attachments: inboundEmails.attachments,
     })
@@ -230,6 +284,7 @@ export async function listReplies(organizationId: string, opportunityId: string)
     read: r.status === "parsed",
     type: r.replyType,
     summary: r.replySummary,
+    date: r.replyDate,
     checkSender: r.checkSender,
     attachments: (r.attachments ?? []).map((a) => ({ name: a.name, size: a.size })),
   }));
@@ -261,4 +316,39 @@ export async function readReplyAttachment(i: { organizationId: string; opportuni
   const file = found?.message.attachments[i.index];
   if (!file || !file.storagePath.startsWith(`org/${i.organizationId}/inbound/${i.emailId}/`)) return null;
   return { file, object: await getStorageProvider().get(file.storagePath) };
+}
+
+export type FileReplyResult = { ok: true; fileName: string } | { ok: false; error: string };
+
+/**
+ * File as a document: one attachment of a reply becomes a solicitation
+ * file on the opportunity and is read like an upload (an amendment PDF
+ * is parsed as any solicitation file is). The bid inbox's
+ * `fileInboundAttachments` does the copy, under the plan's storage
+ * limit. The same file is not filed twice. The caller owns the auth
+ * gate.
+ */
+export async function fileReplyAttachment(i: { organizationId: string; opportunityId: string; emailId: string; index: number; actor: { userId: string; email?: string | null } }): Promise<FileReplyResult> {
+  const { organizationId } = i;
+  const found = await replyMessage(i);
+  const file = found?.message.attachments[i.index];
+  if (!found || !file) return { ok: false, error: "This attachment is no longer available." };
+  const fileName = file.name || "attachment";
+  const [already] = await db
+    .select({ id: solicitations.id })
+    .from(solicitations)
+    .where(and(eq(solicitations.organizationId, organizationId), eq(solicitations.opportunityId, i.opportunityId), eq(solicitations.source, "portal-email"), eq(solicitations.fileName, fileName), eq(solicitations.fileSize, file.size)))
+    .limit(1);
+  if (already) return { ok: false, error: `${fileName} is already among this opportunity's documents.` };
+  const filed = await fileInboundAttachments({ organizationId, emailId: i.emailId, opportunityId: i.opportunityId, userId: i.actor.userId, index: i.index });
+  if (filed === 0) return { ok: false, error: `${fileName} could not be filed. The file may be empty, or the plan's storage may be full.` };
+  await recordAudit({
+    organizationId,
+    actor: i.actor,
+    action: "opportunity.correspondence.filed",
+    resourceType: "opportunity",
+    resourceId: i.opportunityId,
+    metadata: { emailId: i.emailId, fileName, byteSize: file.size, from: found.row.fromAddress },
+  });
+  return { ok: true, fileName };
 }
