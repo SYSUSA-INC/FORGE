@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is in its own PR and completes phase 5. Phase 6 (Deliver) is next and starts with its design.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver) is next: its design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`) is with the owner for review, ten decisions open; no code until they are answered.
 
 ---
 
@@ -4134,7 +4134,7 @@ Every requirement in the FORGE II document, with its status and phase:
    `section_draft_signal`; a discarded draft would clutter Snapshots);
    the measure is taken when a round starts, not when it closes.
 
-   **5d-2 shipped** (this PR, migration 0176; design §2.5, addition 3).
+   **5d-2 shipped** (#502, migration 0176; design §2.5, addition 3).
    `section_style_note`: one row per (tenant, section kind), built by
    `buildStyleNote` (`src/lib/style-note-logic.ts`, pure, no AI call)
    from the tenant's own tracked-change decisions of the last 180 days
