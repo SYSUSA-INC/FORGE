@@ -70,4 +70,6 @@ export const HANDLED_EVENT_TYPES = new Set<string>([
   // Invoicing — settled and failed
   "invoice.paid",
   "invoice.payment_failed",
+  // BL-NAV-LIFECYCLE 5b-2b — a refunded search pack takes its unused searches back
+  "charge.refunded",
 ]);

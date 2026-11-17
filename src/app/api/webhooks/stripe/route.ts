@@ -23,6 +23,7 @@ import { resolveTierFromStripePriceId } from "@/lib/stripe-tier-resolve";
 import { sendPaymentFailedEmail } from "@/lib/stripe-dunning-email";
 import { log } from "@/lib/log";
 import { recordAudit } from "@/lib/audit-log";
+import { creditSearchPackPurchase, refundSearchPackPurchase } from "@/lib/search-credits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -228,8 +229,25 @@ async function dispatchHandler(
       await handleCheckoutCompleted(
         event.data.object as Stripe.Checkout.Session,
         organizationId,
+        event.id,
       );
       break;
+    case "charge.refunded": {
+      // BL-NAV-LIFECYCLE 5b-2b — only a search pack's payment matches a
+      // purchase entry; any other refund is recorded and does nothing here.
+      const charge = event.data.object as Stripe.Charge;
+      const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : (charge.payment_intent?.id ?? null);
+      if (!paymentIntentId) break;
+      const previous = (event.data.previous_attributes as { amount_refunded?: number } | undefined)?.amount_refunded;
+      await refundSearchPackPurchase({
+        paymentIntentId,
+        chargeAmount: charge.amount ?? 0,
+        amountRefunded: charge.amount_refunded ?? 0,
+        previousAmountRefunded: typeof previous === "number" ? previous : 0,
+        stripeEventId: event.id,
+      });
+      break;
+    }
     case "customer.subscription.updated":
       await handleSubscriptionUpdated(
         event.data.object as Stripe.Subscription,
@@ -299,6 +317,7 @@ async function handleInvoicePaymentFailed(
 async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
   organizationId: string | null,
+  eventId: string,
 ): Promise<void> {
   // The session's `client_reference_id` is the organizationId we set
   // when creating the Checkout (Slice 3 wires this). Without it we
@@ -319,6 +338,34 @@ async function handleCheckoutCompleted(
     typeof session.subscription === "string" ? session.subscription : null;
   if (!customerId) {
     throw new Error("checkout.session.completed without a customer id");
+  }
+
+  // BL-NAV-LIFECYCLE 5b-2b — a prepaid search pack (a one-time payment, our
+  // own metadata marks it). It credits the tenant's pack balance once and
+  // never touches the plan's tier or status. The tenant is the one the
+  // session was created for; a session whose metadata names another
+  // organization is refused, and the searches come from the catalogue.
+  if (session.metadata?.kind === "search_pack" && session.metadata.packSlug) {
+    if (session.metadata.organizationId && session.metadata.organizationId !== resolvedOrgId) {
+      throw new Error("search pack checkout: the session's organization does not match the Stripe customer's tenant");
+    }
+    if (session.payment_status !== "paid") {
+      log.warn("[stripe-webhook]", "search pack checkout not paid; nothing credited", { sessionId: session.id, paymentStatus: session.payment_status });
+      return;
+    }
+    const res = await creditSearchPackPurchase({
+      organizationId: resolvedOrgId,
+      packSlug: session.metadata.packSlug,
+      checkoutSessionId: session.id,
+      paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null),
+      stripeEventId: eventId,
+    });
+    if (!res.credited && res.reason === "unknown_pack") throw new Error(`search pack checkout for an unknown pack: ${session.metadata.packSlug}`);
+    await db
+      .update(tenantSubscriptions)
+      .set({ stripeCustomerId: customerId, updatedAt: new Date() })
+      .where(and(eq(tenantSubscriptions.organizationId, resolvedOrgId), isNull(tenantSubscriptions.stripeCustomerId)));
+    return;
   }
 
   // BL-PACKAGES add-ons — an add-on checkout (our own metadata marks it)

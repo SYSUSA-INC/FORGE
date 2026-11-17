@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
 import { setResearchSettingsAction } from "./actions";
@@ -102,7 +103,12 @@ export function ResearchPanel(p: ResearchPanelProps) {
           {p.trialEnded ? " Your trial has ended, so research is paused." : ""}
           {p.packBalance > 0
             ? ` Pack searches: ${n(p.packBalance)} left. They are used only after this month's included searches, do not expire, and are not limited by your cap.`
-            : ""}
+            : ""}{" "}
+          {p.isAdmin ? (
+            <Link href="/settings/billing" className="aur-link">
+              Buy more searches
+            </Link>
+          ) : null}
         </div>
       </div>
 

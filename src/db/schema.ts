@@ -4513,6 +4513,8 @@ export const searchCreditEntries = pgTable(
     packSlug: varchar("pack_slug", { length: 64 }),
     stripeCheckoutSessionId: text("stripe_checkout_session_id"),
     stripeEventId: text("stripe_event_id"),
+    /** 5b-2b — a purchase keeps its payment intent so a refund finds it (migration 0174). */
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
     proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
     actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
     note: text("note").notNull().default(""),
@@ -4523,6 +4525,9 @@ export const searchCreditEntries = pgTable(
     sessionIdx: uniqueIndex("search_credit_entry_session_idx")
       .on(t.stripeCheckoutSessionId)
       .where(sql`${t.stripeCheckoutSessionId} IS NOT NULL`),
+    paymentIntentIdx: index("search_credit_entry_payment_intent_idx")
+      .on(t.stripePaymentIntentId)
+      .where(sql`${t.stripePaymentIntentId} IS NOT NULL`),
   }),
 );
 

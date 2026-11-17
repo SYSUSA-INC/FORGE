@@ -68,8 +68,8 @@ export async function runProposalResearch(input: {
       ok: false,
       skipped:
         reservation.cap === 0
-          ? "No web searches are included in this plan, or the cap is 0, and no pack searches are left."
-          : `This month's web search allowance is used (${reservation.used} of ${reservation.cap}) and no pack searches are left. Research resumes next month.`,
+          ? "No web searches are included in this plan, or the cap is 0, and no pack searches are left. An org admin can buy a pack on Settings → Billing."
+          : `This month's web search allowance is used (${reservation.used} of ${reservation.cap}) and no pack searches are left. Research resumes next month, or at once when an org admin buys a pack on Settings → Billing.`,
     };
   }
   const giveBack = async (unused: number, requestSlot: boolean) => {
