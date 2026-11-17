@@ -13,8 +13,8 @@ export type { HarvestResult } from "@/lib/proposal-harvest";
  * so the brain-index cron can run it for submitted / won proposals that
  * were never harvested; this action keeps the gates and revalidation.
  *
- * Triggered automatically when a proposal is advanced to "submitted"
- * (see advanceProposalStageAction) and when a won outcome is saved;
+ * Triggered automatically when a submission is recorded on the Deliver
+ * tab (see recordSubmission in src/lib/deliver-store.ts) and when a won outcome is saved;
  * also exposed as a manual "Harvest now" button on the proposal page.
  */
 export async function harvestProposalToCorpusAction(

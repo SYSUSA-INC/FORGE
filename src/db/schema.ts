@@ -481,6 +481,8 @@ export const opportunityActivityKindEnum = pgEnum("opportunity_activity_kind", [
   "evaluation_update",
   "competitor_update",
   "owner_change",
+  // BL-NAV-LIFECYCLE 6a — a proposal submission recorded on the Deliver tab (drizzle/0177).
+  "submission",
 ]);
 
 export const opportunityActivities = pgTable("opportunity_activity", {
@@ -2257,6 +2259,8 @@ export const notificationTriggerEventKindEnum = pgEnum(
     "opportunity_lost",
     "proposal_created",
     "proposal_advanced",
+    // BL-NAV-LIFECYCLE 6a — a submission recorded on the Deliver tab (drizzle/0177).
+    "proposal_submitted",
     "proposal_section_overdue",
     "review_request_pending",
     "review_completed",
@@ -2789,6 +2793,76 @@ export const proposalPdfRenders = pgTable("proposal_pdf_render", {
 
 export type ProposalPdfRender = typeof proposalPdfRenders.$inferSelect;
 export type NewProposalPdfRender = typeof proposalPdfRenders.$inferInsert;
+
+/**
+ * BL-NAV-LIFECYCLE 6a — Deliver's submission record (drizzle/0177). One
+ * row per submission of a proposal: how, to whom, by whom, when, a kept
+ * copy and SHA-256 of each file, and the colour-team sign-off as it stood.
+ */
+export const proposalSubmissionMethodEnum = pgEnum("proposal_submission_method", [
+  "portal_email",
+  "own_email",
+  "government_portal",
+  "other",
+]);
+
+export const proposalSubmissionStatusEnum = pgEnum("proposal_submission_status", [
+  "draft",
+  "sending",
+  "sent",
+  "failed",
+  "recorded",
+]);
+
+/** One file of a submission (`proposal_submission.files`): the kept copy under org/{org}/submission/{id}/. */
+export type ProposalSubmissionFile = {
+  renderId: string | null;
+  fileName: string;
+  storagePath: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+};
+
+export const proposalSubmissions = pgTable(
+  "proposal_submission",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    opportunityId: uuid("opportunity_id")
+      .notNull()
+      .references(() => opportunities.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => proposals.id, { onDelete: "cascade" }),
+    method: proposalSubmissionMethodEnum("method").notNull(),
+    status: proposalSubmissionStatusEnum("status").notNull().default("draft"),
+    recipientsTo: jsonb("recipients_to").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    recipientsCc: jsonb("recipients_cc").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    fromAddress: text("from_address").notNull().default(""),
+    replyAddress: text("reply_address").notNull().default(""),
+    messageId: text("message_id").notNull().default(""),
+    note: text("note").notNull().default(""),
+    error: text("error").notNull().default(""),
+    files: jsonb("files").$type<ProposalSubmissionFile[]>().notNull().default(sql`'[]'::jsonb`),
+    /** The sign-off gate as it stood (`SignoffSnapshot`, src/lib/deliver-logic.ts). */
+    signoff: jsonb("signoff").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    overrideReason: text("override_reason").notNull().default(""),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    sentByUserId: text("sent_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgOpportunityIdx: index("proposal_submission_org_opportunity_idx").on(t.organizationId, t.opportunityId, t.createdAt),
+  }),
+);
+
+export type ProposalSubmission = typeof proposalSubmissions.$inferSelect;
 
 export const solicitationParseStatusEnum = pgEnum("solicitation_parse_status", [
   "uploaded",

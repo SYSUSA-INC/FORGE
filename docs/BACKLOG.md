@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver) is next: its design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`) is with the owner for review, ten decisions open; no code until they are answered.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is in its own PR; 6b (send from the portal, migration 0178) is next and needs the owner's DNS step: the inbound subdomain verified in Resend.
 
 ---
 
@@ -4160,6 +4160,36 @@ Every requirement in the FORGE II document, with its status and phase:
    later if the owner wants prose. Not done: a "rebuild now" button
    (the first notes appear after the first Monday run, or when the
    cron is called once by hand). **Phase 5 is complete.**
+
+   **6a shipped** (this PR, migration 0177; design
+   `docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md` §2.1 to §2.3; the
+   owner's 2026-11-17 answers, all recommended). The opportunity gains a
+   **Deliver** tab. **Sign-off** (S-1): one row per colour (Pink, Red,
+   Green, Gold, White Gloves), signed off when its newest round is
+   complete with a pass and every assigned reviewer's own verdict is in
+   and not a fail (`src/lib/deliver-logic.ts`, pure); the gate also
+   needs the White Gloves `submission_pack` tick and a clean export
+   gate. **Record submission** (S-2, and S-5 for now): the lead sends
+   the file themselves, then records how, when and to whom;
+   `recordSubmission` (`src/lib/deliver-store.ts`) keeps a copy of the
+   chosen render under `org/{org}/submission/{id}/` with its SHA-256,
+   writes `proposal_submission`, sets the proposal to `submitted` with
+   `submittedAt`, moves the opportunity through `applyOpportunityStage`,
+   adds an `opportunity_activity` of the new kind `submission`, raises
+   the new trigger event `proposal_submitted` and starts
+   `proposal_harvest` the first time. The gate **blocks**; an org admin
+   or the proposal manager overrides with a reason of ten characters or
+   more, stored on the row and audited
+   (`proposal.submission.gate_override`). Org admins, the proposal
+   manager and the capture manager submit. `advanceProposalStageAction`
+   refuses `submitted`, and the Workflow panel links to the Deliver tab.
+   Audit: `proposal.submission.recorded`, `.gate_override`. Tests:
+   `tests/ai/deliver-logic.test.ts`, `tests/isolation/deliver.test.ts`
+   (tenant B cannot read, record on, or attach a render of tenant A).
+   Not done here, to stay under the diff cap: downloading the kept copy
+   (6b; the chosen render stays downloadable from Export). Also later:
+   the receipt upload and sending from the portal (6b), replies (6c),
+   Reply and Pipeline → Deliver's two lists (6d).
 
 ---
 

@@ -35,7 +35,7 @@ export type ApplyOpportunityStageInput = {
   /** Free text for the activity row; gate decisions carry the reasoning. */
   reasoning?: string;
   /** Recorded on the activity and audit rows. */
-  source: "gate_decision" | "proposal_outcome";
+  source: "gate_decision" | "proposal_outcome" | "submission";
 };
 
 export type ApplyOpportunityStageResult = {
