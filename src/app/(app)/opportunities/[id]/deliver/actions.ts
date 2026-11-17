@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { recordRead } from "@/lib/audit-log";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { fileReplyAttachment, readReplyText, type FileReplyResult } from "@/lib/correspondence";
+import { queueReplySend, type SendReplyResult } from "@/lib/deliver-reply";
 import { queueSubmissionSend, type SendSubmissionResult } from "@/lib/deliver-send";
 import { attachSubmissionReceipt, recordSubmission, type RecordSubmissionResult } from "@/lib/deliver-store";
 
@@ -155,5 +156,42 @@ export async function fileReplyAttachmentAction(input: { opportunityId: string; 
   revalidatePath("/");
   revalidatePath(`/opportunities/${opportunityId}`);
   revalidatePath(`/opportunities/${opportunityId}/deliver`);
+  return res;
+}
+
+/**
+ * BL-NAV-LIFECYCLE 6d-1 (S-4, Answering) — Reply on a filed message: the
+ * answer goes to the message's sender from the opportunity's own
+ * address, in the same thread, once, in the send job. The same people
+ * as may submit; no sign-off gate, and nothing moves a stage. Files
+ * arrive by upload id. The job audits
+ * `opportunity.correspondence.replied` or `proposal.submission.send_failed`.
+ */
+export async function sendReplyAction(input: {
+  opportunityId: string;
+  emailId: string;
+  cc: string;
+  ccSender: boolean;
+  subject: string;
+  body: string;
+  uploads?: { uploadId: string; fileName: string }[];
+}): Promise<SendReplyResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  const opportunityId = String(input?.opportunityId ?? "");
+  const res = await queueReplySend({
+    organizationId,
+    opportunityId,
+    user: { id: actor.id, email: actor.email, name: actor.name, role: actor.role, isSuperadmin: actor.isSuperadmin },
+    emailId: String(input?.emailId ?? ""),
+    cc: String(input?.cc ?? ""),
+    ccSender: input?.ccSender !== false,
+    subject: String(input?.subject ?? ""),
+    body: String(input?.body ?? ""),
+    uploads: (Array.isArray(input?.uploads) ? input.uploads : []).slice(0, 20).map((u) => ({ uploadId: String(u?.uploadId ?? ""), fileName: String(u?.fileName ?? "") })),
+  });
+  if (!res.ok) return res;
+  revalidatePath(`/opportunities/${opportunityId}/deliver`);
+  revalidatePath(`/opportunities/${opportunityId}/activity`);
   return res;
 }

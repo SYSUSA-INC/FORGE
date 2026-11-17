@@ -40,6 +40,8 @@ export function DeliverClient({ view }: { view: DeliverView }) {
   const { proposal, gate } = view;
   // A send runs in a job: look again while one is on its way.
   const sending = view.submissions.some((s) => s.status === "sending");
+  // An answer to a reply is correspondence: it is listed there, not among the submissions.
+  const submissions = view.submissions.filter((s) => !s.inReplyToEmailId);
   useEffect(() => {
     if (!sending) return;
     const timer = setInterval(() => router.refresh(), 5000);
@@ -198,12 +200,12 @@ export function DeliverClient({ view }: { view: DeliverView }) {
         {done ? <p role="status" className="mt-3 font-body text-[13px] text-green">{done}</p> : null}
       </Panel>
 
-      <Panel title="Submissions" eyebrow={view.submissions.length === 0 ? "None yet" : `${view.submissions.length} on record`}>
-        {view.submissions.length === 0 ? (
+      <Panel title="Submissions" eyebrow={submissions.length === 0 ? "None yet" : `${submissions.length} on record`}>
+        {submissions.length === 0 ? (
           <p className="font-body text-[13px] text-muted">Nothing has been submitted for this opportunity.</p>
         ) : (
           <ul className="flex flex-col divide-y divide-layer/10">
-            {view.submissions.map((s) => (
+            {submissions.map((s) => (
               <li key={s.id} className="flex flex-col gap-1 py-3">
                 <span className="font-body text-[13px] text-text">
                   {SUBMISSION_METHOD_LABELS[s.method]} · {s.sentAt ? when(s.sentAt) : (SUBMISSION_STATUS_LABELS[s.status] ?? s.status)} · {s.sentBy}

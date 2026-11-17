@@ -35,6 +35,8 @@ type SendEmailOptions = {
   attachments?: { filename: string; content: Buffer; contentType: string }[];
   /** The provider sends one message per key (24 hours), however often the call is repeated. */
   idempotencyKey?: string;
+  /** BL-NAV-LIFECYCLE 6d-1 — extra message headers (`In-Reply-To`, `References`, so an answer stays in its thread). */
+  headers?: Record<string, string>;
 };
 
 export async function sendEmail(opts: SendEmailOptions): Promise<void> {
@@ -67,6 +69,7 @@ export async function sendEmailTracked(opts: SendEmailOptions): Promise<{ stubbe
     ...(opts.cc?.length ? { cc: opts.cc } : {}),
     ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
     ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
+    ...(opts.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
   };
   const emails = getClient().emails;
   const res = opts.idempotencyKey ? await emails.send(message, { idempotencyKey: opts.idempotencyKey }) : await emails.send(message);

@@ -2862,6 +2862,8 @@ export const proposalSubmissions = pgTable(
     overrideReason: text("override_reason").notNull().default(""),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     sentByUserId: text("sent_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** BL-NAV-LIFECYCLE 6d-1 — set on an answer to a reply (drizzle/0180): the inbound message it answers. Such a row is not a submission. */
+    inReplyToEmailId: uuid("in_reply_to_email_id").references((): AnyPgColumn => inboundEmails.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
