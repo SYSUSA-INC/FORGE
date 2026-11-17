@@ -18,6 +18,8 @@ export type ResearchPanelProps = {
   cap: number;
   used: number;
   remaining: number;
+  /** Prepaid pack searches held; used only after the plan's. */
+  packBalance: number;
   trialEnded: boolean;
   providerReady: boolean;
   monthLabel: string;
@@ -98,6 +100,9 @@ export function ResearchPanel(p: ResearchPanelProps) {
             ? `Included with your plan: ${n(p.planAllowance)} per month${p.monthlyCap !== null ? ` · your cap ${n(p.monthlyCap)}` : ""}. Resets on the 1st (UTC).`
             : "No web searches are included with your plan; ask your FORGE administrator to add an allowance."}
           {p.trialEnded ? " Your trial has ended, so research is paused." : ""}
+          {p.packBalance > 0
+            ? ` Pack searches: ${n(p.packBalance)} left. They are used only after this month's included searches, do not expire, and are not limited by your cap.`
+            : ""}
         </div>
       </div>
 

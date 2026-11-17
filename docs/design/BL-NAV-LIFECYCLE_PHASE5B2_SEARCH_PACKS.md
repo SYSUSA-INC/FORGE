@@ -1,10 +1,11 @@
 # Phase 5b-2 — Prepaid search packs: design for review
 
-**Status:** for the owner's review. Nothing is built. The owner already
+**Status:** approved by the owner (2026-11-17, "all recommended") with
+every recommended answer in §4. 5b-2a (the balance, the ledger, the draw)
+is built; 5b-2b (buying) follows. Background: the owner already
 chose the model (2026-11-16): **prepaid credit packs through Stripe
 Checkout**, not metered card-on-file billing. Searches draw the pack
-down, research pauses at zero, no overage, no dunning. Six decisions
-remain open (§4); each has a recommended answer.
+down, research pauses at zero, no overage, no dunning.
 **Requirements:** FORGE II D-2 in `docs/FORGE_II_REQUIREMENTS.md`.
 **Plan:** BL-NAV-LIFECYCLE phase 5, after 5b-1a (#496) and 5b-1b (#497).
 **Parent design:** `BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md` §2.2.

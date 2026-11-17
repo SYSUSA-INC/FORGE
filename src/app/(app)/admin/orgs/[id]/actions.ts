@@ -13,7 +13,38 @@ import { requireSuperadmin } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
 import { parseDomainList } from "@/lib/email-domain";
 import { log } from "@/lib/log";
+import { adjustSearchCredits } from "@/lib/search-credits";
 import { assignTenantTier, convertTenantTrial, extendTenantTrial, startTenantTrial } from "@/lib/tenant-subscription";
+
+/**
+ * BL-NAV-LIFECYCLE 5b-2a — a platform admin corrects a tenant's prepaid
+ * web-search pack balance. Like trialAction the target tenant is a
+ * parameter because the superadmin acts on another organization; it opens
+ * with requireSuperadmin() and is audited in that tenant's log
+ * (`admin.search_credit.adjust`, written by adjustSearchCredits).
+ */
+export async function adjustSearchCreditsAction(input: {
+  organizationId: string;
+  delta: number;
+  note: string;
+}): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
+  const actor = await requireSuperadmin();
+  const [org] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.id, input.organizationId ?? ""))
+    .limit(1);
+  if (!org) return { ok: false, error: "Organization not found." };
+  const res = await adjustSearchCredits({
+    organizationId: org.id,
+    delta: Number(input.delta),
+    note: String(input.note ?? ""),
+    actor: { userId: actor.id, email: actor.email },
+  });
+  if (!res.ok) return res;
+  revalidatePath(`/admin/orgs/${org.id}`);
+  return res;
+}
 
 /**
  * BL-AUTH-ABUSE Slice 2a — a platform admin starts, extends or converts a

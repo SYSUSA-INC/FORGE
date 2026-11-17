@@ -188,7 +188,7 @@ async function researchCanRun(organizationId: string): Promise<boolean> {
   ]);
   const settings = await getResearchSettings(organizationId);
   if (!settings.enabled || getAIProviderStatus().active.name !== "anthropic") return false;
-  return (await getWebSearchAllowance(organizationId)).remaining > 0;
+  return (await getWebSearchAllowance(organizationId)).available > 0;
 }
 
 /** The newest research step of a proposal: how it stands and what it did or why it did not. */

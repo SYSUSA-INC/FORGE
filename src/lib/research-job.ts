@@ -62,25 +62,25 @@ export async function runProposalResearch(input: {
   if (!row) throw new JobPermanentError("Proposal no longer exists.");
 
   // The cap is checked here, before any search: reserve, search, give back the rest.
-  const reservation = await reserveWebSearches(organizationId, MAX_SEARCHES_PER_RUN);
+  const reservation = await reserveWebSearches(organizationId, MAX_SEARCHES_PER_RUN, { proposalId });
   if (reservation.reserved === 0) {
     return {
       ok: false,
       skipped:
         reservation.cap === 0
-          ? "No web searches are included in this plan, or the cap is 0."
-          : `This month's web search allowance is used (${reservation.used} of ${reservation.cap}). Research resumes next month.`,
+          ? "No web searches are included in this plan, or the cap is 0, and no pack searches are left."
+          : `This month's web search allowance is used (${reservation.used} of ${reservation.cap}) and no pack searches are left. Research resumes next month.`,
     };
   }
   const giveBack = async (unused: number, requestSlot: boolean) => {
-    await releaseWebSearches(organizationId, unused);
+    await releaseWebSearches(organizationId, unused, { fromPack: reservation.fromPack, proposalId });
     if (requestSlot) await refundQuota(organizationId, "aiRequestsPerMonth");
   };
 
   try {
     await enforceQuota(organizationId, "aiRequestsPerMonth");
   } catch (err) {
-    await releaseWebSearches(organizationId, reservation.reserved);
+    await releaseWebSearches(organizationId, reservation.reserved, { fromPack: reservation.fromPack, proposalId });
     if (err instanceof QuotaExceededError) return { ok: false, skipped: err.message };
     throw err;
   }
@@ -113,7 +113,7 @@ export async function runProposalResearch(input: {
   }
 
   const searches = Math.min(ai.webSearch.requests, reservation.reserved);
-  await releaseWebSearches(organizationId, reservation.reserved - searches);
+  await releaseWebSearches(organizationId, reservation.reserved - searches, { fromPack: reservation.fromPack, proposalId });
   const sources = selectResearchSources({ citations: ai.webSearch.citations, pageAges: ai.webSearch.pageAges, settings });
   const stored = sources.length > 0 ? await replaceResearchSources({ organizationId, proposalId, userId: input.userId, sources, retrievedAt: new Date() }) : 0;
 
@@ -123,7 +123,7 @@ export async function runProposalResearch(input: {
     action: "proposal.research.run",
     resourceType: "proposal",
     resourceId: proposalId,
-    metadata: { searches, reserved: reservation.reserved, sources: stored, model: ai.model, allowList: settings.allowedDomains.length, blockList: settings.blockedDomains.length },
+    metadata: { searches, reserved: reservation.reserved, fromPack: Math.max(0, reservation.fromPack - (reservation.reserved - searches)), sources: stored, model: ai.model, allowList: settings.allowedDomains.length, blockList: settings.blockedDomains.length },
   });
   if (stored === 0) {
     log.info("[research]", "no usable sources", { organizationId, proposalId, searches });
