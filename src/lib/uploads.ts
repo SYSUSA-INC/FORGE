@@ -33,6 +33,7 @@ import {
   proposalTemplates,
   sectionChatAttachments,
   opportunityPlans,
+  proposalSubmissions,
   solicitationDocuments,
   solicitations,
   type FileUpload,
@@ -913,6 +914,14 @@ async function recordHoldsUpload(row: Pick<FileUpload, "organizationId" | "resou
           .select({ id: opportunityPlans.id })
           .from(opportunityPlans)
           .where(and(eq(opportunityPlans.organizationId, organizationId), eq(opportunityPlans.agreementStorageKey, storageKey)))
+          .limit(1),
+      );
+    case "submission_file":
+      return found(
+        db
+          .select({ id: proposalSubmissions.id })
+          .from(proposalSubmissions)
+          .where(and(eq(proposalSubmissions.organizationId, organizationId), sql`${proposalSubmissions.files} @> ${JSON.stringify([{ storagePath: storageKey }])}::jsonb`))
           .limit(1),
       );
     case "solicitation_document":

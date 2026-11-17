@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { opportunities, organizations, proposalPdfRenders, proposalSubmissions, users, type BackgroundJob, type ProposalSubmissionFile } from "@/db/schema";
+import { opportunities, organizations, proposalPdfRenders, proposalSubmissions, users, type BackgroundJob } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import {
   attachmentFileName,
@@ -14,6 +14,8 @@ import {
   SEND_MAX_FILES,
   sendFromHeader,
   snapshotOf,
+  type SubmissionFile,
+  uploadedFileName,
 } from "@/lib/deliver-logic";
 import { auditGateOverride, markDelivered, rendersOf, sendConfigured, submissionContext, type DeliverUser } from "@/lib/deliver-store";
 import { EmailRefusedError, sendEmailTracked } from "@/lib/email";
@@ -21,6 +23,7 @@ import { inboundDomain } from "@/lib/inbound-email-logic";
 import { runDurable } from "@/lib/jobs";
 import { JobPermanentError } from "@/lib/jobs-policy";
 import { getStorageProvider } from "@/lib/storage";
+import { claimUpload, finishClaim, releaseClaim } from "@/lib/uploads";
 
 /**
  * BL-NAV-LIFECYCLE 6b (FORGE II S-3) — Send from FORGE. The lead fills
@@ -77,6 +80,8 @@ export type SendSubmissionInput = {
   body: string;
   /** The kept renders to attach, each under the name the lead gave it. */
   files: { renderId: string; fileName: string }[];
+  /** 6b-2 — other files to attach (a signed form), uploaded with `uploadFile()` and named here. */
+  uploads?: { uploadId: string; fileName: string }[];
   overrideReason?: string;
 };
 
@@ -102,10 +107,11 @@ export async function queueSubmissionSend(input: SendSubmissionInput): Promise<S
 
   const chosen = Array.isArray(input.files) ? input.files : [];
   if (chosen.length === 0) return { ok: false, error: "Choose at least one file to send." };
-  if (chosen.length > SEND_MAX_FILES) return { ok: false, error: `At most ${SEND_MAX_FILES} files.` };
+  const uploads = Array.isArray(input.uploads) ? input.uploads : [];
+  if (chosen.length + uploads.length > SEND_MAX_FILES) return { ok: false, error: `At most ${SEND_MAX_FILES} files.` };
   const renders = await rendersOf(organizationId, proposal.id);
   const submissionId = randomUUID();
-  const files: ProposalSubmissionFile[] = [];
+  const files: SubmissionFile[] = [];
   for (const c of chosen) {
     const render = renders.find((r) => r.id === String(c?.renderId ?? ""));
     if (!render) return { ok: false, error: "One of the chosen files is not a render of this proposal. Choose the files again." };
@@ -115,10 +121,25 @@ export async function queueSubmissionSend(input: SendSubmissionInput): Promise<S
     // The copy and its SHA-256 are made by the job, from the bytes it attaches.
     files.push({ renderId: render.id, fileName, storagePath: `org/${organizationId}/submission/${submissionId}/${fileName}`, contentType: render.contentType, byteSize: render.byteSize, sha256: "" });
   }
-  if (files.reduce((n, f) => n + f.byteSize, 0) > SEND_MAX_BYTES) return { ok: false, error: TOO_LARGE };
-
   const address = await ensureDeliveryAddress(organizationId, opportunityId);
   if (!address) return { ok: false, error: NOT_SET_UP };
+
+  // The uploaded extras are claimed last, so a refusal above leaves them free to use again.
+  const claims: { uploadId: string; claimedAt: Date }[] = [];
+  const refuse = async (error: string): Promise<SendSubmissionResult> => {
+    for (const c of claims) await releaseClaim({ organizationId, uploadId: c.uploadId, claimedAt: c.claimedAt });
+    return { ok: false, error };
+  };
+  for (const u of uploads) {
+    const claim = await claimUpload({ organizationId, userId: user.id, uploadId: String(u?.uploadId ?? ""), resourceType: "submission_file", resourceId: submissionId });
+    if (!claim.ok) return refuse(claim.error);
+    if ("alreadyClaimed" in claim) return refuse("One of the uploaded files was already used. Upload it again.");
+    claims.push({ uploadId: claim.claim.uploadId, claimedAt: claim.claim.claimedAt });
+    const fileName = uploadedFileName(String(u?.fileName ?? ""), claim.claim.fileName);
+    if (files.some((f) => f.fileName.toLowerCase() === fileName.toLowerCase())) return refuse(`Two files are named “${fileName}”. Give each its own name.`);
+    files.push({ kind: "extra", renderId: null, fileName, storagePath: claim.claim.storageKey, contentType: claim.claim.contentType, byteSize: claim.claim.size, sha256: "" });
+  }
+  if (files.reduce((n, f) => n + f.byteSize, 0) > SEND_MAX_BYTES) return refuse(TOO_LARGE);
 
   await db.insert(proposalSubmissions).values({
     id: submissionId,
@@ -138,6 +159,7 @@ export async function queueSubmissionSend(input: SendSubmissionInput): Promise<S
     overrideReason: reason,
     sentByUserId: user.id,
   });
+  for (const c of claims) await finishClaim({ organizationId, uploadId: c.uploadId, claimedAt: c.claimedAt });
   await auditGateOverride({ organizationId, opportunityId, submissionId, actor: { userId: user.id, email: user.email }, ctx });
   await runDurable("[deliver] send", { organizationId, kind: "submission_send", resourceId: submissionId, requestedByUserId: user.id });
   return { ok: true, submissionId, overridden };
@@ -176,10 +198,10 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
   if (!sendConfigured() || !row.fromAddress) await fail(NOT_SET_UP);
 
   const storage = getStorageProvider();
-  const files: ProposalSubmissionFile[] = [];
+  const files: SubmissionFile[] = [];
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
-  for (const f of row.files ?? []) {
-    // A retried job finds the copy it already made.
+  for (const f of (row.files ?? []) as SubmissionFile[]) {
+    // A retried job finds the copy it already made; an uploaded extra is already at its own key.
     let object = await storage.get(f.storagePath);
     if (!object) {
       const [render] = f.renderId
@@ -251,7 +273,7 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
       from: row.fromAddress,
       subject: row.subject,
       messageId,
-      files: files.map((f) => ({ renderId: f.renderId, fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256 })),
+      files: files.map((f) => ({ kind: f.kind ?? "proposal", renderId: f.renderId, fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256 })),
     },
   });
 }

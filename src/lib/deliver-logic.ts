@@ -206,15 +206,44 @@ export function defaultSendSubject(input: { solicitationNumber: string; title: s
  */
 export function attachmentFileName(typed: string, fallbackTitle: string, contentType: string): string {
   const ext = contentType === "docx" ? "docx" : "pdf";
-  const stem = String(typed ?? "")
+  const stem = safeStem(typed, /\.(pdf|docx)$/i);
+  return stem ? `${stem}.${ext}` : submissionFileName(fallbackTitle, contentType);
+}
+
+function safeStem(text: string, extension: RegExp): string {
+  return String(text ?? "")
     .normalize("NFKD")
-    .replace(/\.(pdf|docx)$/i, "")
+    .replace(extension, "")
     .replace(/[^A-Za-z0-9 ._()-]+/g, "-")
     .replace(/\s+/g, " ")
     .replace(/^[-. ]+|[-. ]+$/g, "")
     .slice(0, 100);
-  return stem ? `${stem}.${ext}` : submissionFileName(fallbackTitle, contentType);
 }
+
+const UPLOAD_EXT = /\.([A-Za-z0-9]{1,5})$/;
+
+/** 6b-2 — the name an uploaded file is sent or kept under: the typed name (or its own) made safe, with the upload's own extension. */
+export function uploadedFileName(typed: string, original: string): string {
+  const ext = (UPLOAD_EXT.exec(String(original ?? "").trim())?.[1] ?? "bin").toLowerCase();
+  return `${safeStem(String(typed ?? "").trim() || original, UPLOAD_EXT) || "file"}.${ext}`;
+}
+
+export const RECEIPTS_MAX = 5;
+
+/**
+ * One entry of `proposal_submission.files` as 6b-2 writes it: `extra` is
+ * an uploaded file sent with the renders, `receipt` one attached
+ * afterwards (both stay at their upload's own key); absent for a render.
+ */
+export type SubmissionFile = {
+  kind?: "extra" | "receipt";
+  renderId: string | null;
+  fileName: string;
+  storagePath: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+};
 
 /** The plain message as the HTML part: escaped, line breaks kept. */
 export function plainBodyHtml(text: string): string {

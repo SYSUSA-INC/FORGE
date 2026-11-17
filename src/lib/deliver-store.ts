@@ -17,7 +17,6 @@ import {
   solicitations,
   users,
   type ProposalStage,
-  type ProposalSubmissionFile,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { getComplianceGateStatus } from "@/lib/compliance-gate";
@@ -27,6 +26,8 @@ import {
   canSubmit,
   defaultSendSubject,
   OVERRIDE_REASON_MIN,
+  RECEIPTS_MAX,
+  uploadedFileName,
   parseRecipients,
   parseSentAt,
   RECORD_METHODS,
@@ -37,6 +38,7 @@ import {
   type RecordMethod,
   type SignoffGate,
   type SignoffRound,
+  type SubmissionFile,
 } from "@/lib/deliver-logic";
 import { emailConfigured } from "@/lib/email";
 import { inboundDomain } from "@/lib/inbound-email-logic";
@@ -46,6 +48,7 @@ import { dispatchTriggerEvent } from "@/lib/notification-dispatcher";
 import { applyOpportunityStage } from "@/lib/opportunity-stage";
 import { mergeLmStructures } from "@/lib/solicitation-lm";
 import { getStorageProvider } from "@/lib/storage";
+import { claimUpload, failClaim, finishClaim, getVerifiedObject, releaseClaim } from "@/lib/uploads";
 
 /**
  * BL-NAV-LIFECYCLE 6a (FORGE II S-1, S-2) — Deliver's store: the
@@ -76,7 +79,8 @@ export type DeliverSubmission = {
   error: string;
   note: string;
   overrideReason: string;
-  files: { fileName: string; byteSize: number; sha256: string }[];
+  /** In stored order: the download route takes the position. `kept` once FORGE holds the bytes. */
+  files: { kind: "proposal" | "extra" | "receipt"; fileName: string; byteSize: number; sha256: string; kept: boolean }[];
 };
 
 export type DeliverView = {
@@ -222,7 +226,7 @@ export async function listSubmissions(organizationId: string, opportunityId: str
     error: r.error,
     note: r.note,
     overrideReason: r.overrideReason,
-    files: (r.files ?? []).map((f) => ({ fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256 })),
+    files: ((r.files ?? []) as SubmissionFile[]).map((f) => ({ kind: f.kind ?? "proposal", fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256, kept: f.sha256 !== "" })),
   }));
 }
 
@@ -342,7 +346,7 @@ export async function markDelivered(d: {
   now: Date;
   recipients: string[];
   note: string;
-  files: ProposalSubmissionFile[];
+  files: SubmissionFile[];
   overridden: boolean;
   auditAction: "proposal.submission.recorded" | "proposal.submission.sent";
   auditMetadata: Record<string, unknown>;
@@ -451,7 +455,7 @@ export async function recordSubmission(input: RecordSubmissionInput): Promise<Re
 
   const submissionId = randomUUID();
   const fileName = submissionFileName(proposal.title, render.contentType);
-  const file: ProposalSubmissionFile = {
+  const file: SubmissionFile = {
     renderId: render.id,
     fileName,
     storagePath: `org/${organizationId}/submission/${submissionId}/${fileName}`,
@@ -496,4 +500,84 @@ export async function recordSubmission(input: RecordSubmissionInput): Promise<Re
     auditMetadata: { renderId: render.id, fileName, byteSize: file.byteSize, sha256: file.sha256, signedOff: gate.signedOff },
   });
   return { ok: true, submissionId, overridden };
+}
+
+/** One file of a submission, for the download route: null when the submission or the file is not the tenant's. */
+export async function readSubmissionFile(i: { organizationId: string; opportunityId: string; submissionId: string; index: number }) {
+  const [row] = await db
+    .select({ proposalId: proposalSubmissions.proposalId, files: proposalSubmissions.files })
+    .from(proposalSubmissions)
+    .where(and(eq(proposalSubmissions.id, i.submissionId), eq(proposalSubmissions.organizationId, i.organizationId), eq(proposalSubmissions.opportunityId, i.opportunityId)))
+    .limit(1);
+  const file = (row?.files as SubmissionFile[] | undefined)?.[i.index];
+  if (!row || !file || !file.sha256 || !file.storagePath.startsWith(`org/${i.organizationId}/`)) return null;
+  const object = await getStorageProvider().get(file.storagePath);
+  return { proposalId: row.proposalId, file, object };
+}
+
+/**
+ * 6b-2 — attach a receipt (the portal's confirmation, the officer's
+ * acknowledgement) to a submission on record. The browser uploaded it
+ * with `uploadFile()`; it is filed here by upload id and stays at the
+ * upload's own key (convention 11).
+ */
+export async function attachSubmissionReceipt(i: { organizationId: string; opportunityId: string; submissionId: string; user: DeliverUser; uploadId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { organizationId, opportunityId, submissionId, user } = i;
+  const [row] = await db
+    .select({ id: proposalSubmissions.id, proposalId: proposalSubmissions.proposalId, status: proposalSubmissions.status, files: proposalSubmissions.files })
+    .from(proposalSubmissions)
+    .where(and(eq(proposalSubmissions.id, submissionId), eq(proposalSubmissions.organizationId, organizationId), eq(proposalSubmissions.opportunityId, opportunityId)))
+    .limit(1);
+  if (!row) return { ok: false, error: "Submission not found." };
+  const [leads] = await db
+    .select({ proposalManagerUserId: proposals.proposalManagerUserId, captureManagerUserId: proposals.captureManagerUserId })
+    .from(proposals)
+    .where(and(eq(proposals.id, row.proposalId), eq(proposals.organizationId, organizationId)))
+    .limit(1);
+  if (!leads || !canSubmit(user, leads)) return { ok: false, error: "Only an org admin, the proposal manager or the capture manager can attach a receipt." };
+  if (row.status !== "sent" && row.status !== "recorded") return { ok: false, error: "A receipt is attached once the submission has been sent or recorded." };
+  const files: SubmissionFile[] = row.files ?? [];
+  if (files.filter((f) => f.kind === "receipt").length >= RECEIPTS_MAX) return { ok: false, error: `At most ${RECEIPTS_MAX} receipts on one submission.` };
+
+  const claim = await claimUpload({ organizationId, userId: user.id, uploadId: String(i.uploadId ?? ""), resourceType: "submission_file", resourceId: submissionId });
+  if (!claim.ok) return { ok: false, error: claim.error };
+  if ("alreadyClaimed" in claim) return { ok: true };
+  const up = claim.claim;
+  const mark = { organizationId, uploadId: up.uploadId, claimedAt: up.claimedAt };
+  try {
+    const object = await getVerifiedObject({ organizationId, storagePath: up.storageKey });
+    if (!object.ok) {
+      await failClaim({ ...mark, reason: object.reason, detail: "The uploaded receipt could not be read back." });
+      return { ok: false, error: "The uploaded file could not be read. Upload it again." };
+    }
+    let fileName = uploadedFileName("", up.fileName);
+    if (files.some((f) => f.fileName.toLowerCase() === fileName.toLowerCase())) fileName = `receipt-${Date.now()}-${fileName}`;
+    const file: SubmissionFile = {
+      kind: "receipt",
+      renderId: null,
+      fileName,
+      storagePath: up.storageKey,
+      contentType: object.contentType,
+      byteSize: object.bytes.byteLength,
+      sha256: createHash("sha256").update(object.bytes).digest("hex"),
+    };
+    await db
+      .update(proposalSubmissions)
+      .set({ files: [...files, file], updatedAt: new Date() })
+      .where(and(eq(proposalSubmissions.id, row.id), eq(proposalSubmissions.organizationId, organizationId)));
+    await finishClaim(mark);
+    await recordAudit({
+      organizationId,
+      actor: { userId: user.id, email: user.email },
+      action: "proposal.submission.receipt_attached",
+      resourceType: "proposal",
+      resourceId: row.proposalId,
+      metadata: { submissionId, opportunityId, fileName, byteSize: file.byteSize, sha256: file.sha256 },
+    });
+    return { ok: true };
+  } catch (err) {
+    log.error("[attachSubmissionReceipt]", "could not file the receipt", { submissionId, error: err });
+    await releaseClaim(mark);
+    return { ok: false, error: "Could not attach the file; try again." };
+  }
 }
