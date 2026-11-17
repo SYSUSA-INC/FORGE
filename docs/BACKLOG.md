@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is in its own PR; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload on Record submission, extra uploaded files on a send) is next, then 6c (replies).
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is in its own PR; 6c (replies, migration 0179) is next.
 
 ---
 
@@ -4191,7 +4191,7 @@ Every requirement in the FORGE II document, with its status and phase:
    the receipt upload and sending from the portal (6b), replies (6c),
    Reply and Pipeline → Deliver's two lists (6d).
 
-   **6b-1 shipped** (this PR, migration 0178; design §2.4, FORGE II
+   **6b-1 shipped** (#505, migration 0178; design §2.4, FORGE II
    S-3). **Send from FORGE** on the Deliver tab: To and Cc (the
    agency's `contracting_officer` contacts suggested), a subject
    starting with the solicitation number, a plain body, one or more
@@ -4221,6 +4221,24 @@ Every requirement in the FORGE II document, with its status and phase:
    with its instance stays `Sending…` (check the Cc copy before
    sending again). **6b-2 next:** the kept copy's download route, the
    receipt upload and extra uploaded files (convention 11).
+
+   **6b-2 shipped** (this PR, no migration). A new upload resource
+   type `submission_file` (claimable from the `document` purpose;
+   `recordHoldsUpload` looks for the key in `proposal_submission.files`).
+   **Extra files on a send:** the Send form's *Add another file*
+   uploads with `uploadFile()`; `queueSubmissionSend` claims each by
+   upload id last (a refusal releases them), lists it in `files` with
+   `kind: "extra"` at the upload's own key, and the job attaches and
+   hashes it with the renders. **Receipts:** *Attach a receipt* on a
+   sent or recorded submission (`attachSubmissionReceipt`, `kind:
+   "receipt"`, up to five, same permission as submitting; attached
+   after recording so a confirmation that arrives later can be kept).
+   **Download:** `/api/opportunities/[id]/submissions/[submissionId]/file?i=`
+   serves one kept file as an attachment, tenant-scoped, with
+   `recordRead` `proposal.submission.download`. Audit:
+   `proposal.submission.receipt_attached`. Tests:
+   `tests/isolation/deliver-files.test.ts`. Not done: removing a
+   receipt once attached.
 
 ---
 

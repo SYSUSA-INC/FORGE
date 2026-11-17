@@ -14,6 +14,7 @@ import {
   SEND_WARN_BYTES,
   sendFromHeader,
   sendSize,
+  uploadedFileName,
   canOverride,
   canSubmit,
   colourSignoff,
@@ -182,6 +183,14 @@ describe("6b — the rules of Send from FORGE", () => {
     expect(attachmentFileName("Acme_Vol2.PDF", "T", "docx")).toBe("Acme_Vol2.docx");
     expect(attachmentFileName("../../etc/passwd", "T", "pdf")).toBe("etc-passwd.pdf");
     expect(attachmentFileName("   ", "Cloud Ops", "pdf")).toBe("Cloud-Ops.pdf");
+  });
+
+  it("names an uploaded file safely and keeps its own extension", () => {
+    expect(uploadedFileName("", "SF 1449 signed.PDF")).toBe("SF 1449 signed.pdf");
+    expect(uploadedFileName("SF-1449 (signed)", "scan0001.pdf")).toBe("SF-1449 (signed).pdf");
+    expect(uploadedFileName("price sheet.exe", "Pricing.xlsx")).toBe("price sheet.xlsx");
+    expect(uploadedFileName("../../x", "noext")).toBe("x.bin");
+    expect(uploadedFileName("", "")).toBe("file.bin");
   });
 
   it("escapes the plain message for the HTML part", () => {

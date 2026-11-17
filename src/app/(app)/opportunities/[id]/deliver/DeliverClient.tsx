@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { OVERRIDE_REASON_MIN, RECORD_METHODS, SIGNOFF_COLOR_LABELS, SUBMISSION_METHOD_LABELS, SUBMISSION_STATUS_LABELS, signoffLine, type ColourSignoff, type RecordMethod } from "@/lib/deliver-logic";
 import type { DeliverView } from "@/lib/deliver-store";
 import { recordSubmissionAction } from "./actions";
+import { ReceiptUpload } from "./ReceiptUpload";
 import { SendPanel } from "./SendPanel";
 
 const STATE_TEXT: Record<ColourSignoff["state"], { label: string; tone: string }> = {
@@ -211,12 +212,19 @@ export function DeliverClient({ view }: { view: DeliverView }) {
                 {s.recipients.length > 0 ? <span className="font-mono text-[11px] text-muted">To {s.recipients.join(", ")}{s.cc.length > 0 ? ` · Cc ${s.cc.join(", ")}` : ""}</span> : null}
                 {s.note ? <span className="font-body text-[13px] text-muted">{s.note}</span> : null}
                 {s.overrideReason ? <span className="font-body text-[13px] text-brass">Submitted before full sign-off: {s.overrideReason}</span> : null}
-                {s.files.map((f) => (
+                {s.files.map((f, i) => (
                   <span key={f.fileName} className="font-mono text-[11px] text-muted">
-                    {f.fileName} · {mb(f.byteSize)}
+                    {f.kind === "receipt" ? "Receipt: " : ""}
+                    {f.kept ? (
+                      <a href={`/api/opportunities/${view.opportunityId}/submissions/${s.id}/file?i=${i}`} className="text-cobalt underline-offset-2 hover:underline">{f.fileName}</a>
+                    ) : (
+                      f.fileName
+                    )}{" "}
+                    · {mb(f.byteSize)}
                     {f.sha256 ? ` · SHA-256 ${f.sha256.slice(0, 16)}…` : ""}
                   </span>
                 ))}
+                {view.canSubmit && (s.status === "sent" || s.status === "recorded") ? <ReceiptUpload opportunityId={view.opportunityId} submissionId={s.id} /> : null}
               </li>
             ))}
           </ul>

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { OVERRIDE_REASON_MIN, SEND_MAX_FILES, sendSize, submissionFileName } from "@/lib/deliver-logic";
 import type { DeliverView } from "@/lib/deliver-store";
+import { uploadFile } from "@/lib/upload-client";
 import { sendSubmissionAction } from "./actions";
 
 const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 2 : 1)} MB`;
@@ -31,11 +32,15 @@ export function SendPanel({ view }: { view: DeliverView }) {
   const [body, setBody] = useState("Please find our proposal attached. Kindly confirm receipt.");
   const [names, setNames] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  // Other files to attach (a signed form): uploaded by the browser, sent by upload id.
+  const [extras, setExtras] = useState<{ uploadId: string; fileName: string; size: number }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const extraInput = useRef<HTMLInputElement>(null);
   const { proposal, gate, send } = view;
   if (!proposal || !gate) return null;
 
   const chosen = view.renders.filter((r) => names[r.id] !== undefined);
-  const total = chosen.reduce((n, r) => n + r.byteSize, 0);
+  const total = chosen.reduce((n, r) => n + r.byteSize, 0) + extras.reduce((n, x) => n + x.size, 0);
   const size = sendSize(total);
   const needsOverride = !gate.clear;
   const ready =
@@ -43,7 +48,8 @@ export function SendPanel({ view }: { view: DeliverView }) {
     subject.trim() !== "" &&
     body.trim() !== "" &&
     chosen.length > 0 &&
-    chosen.length <= SEND_MAX_FILES &&
+    chosen.length + extras.length <= SEND_MAX_FILES &&
+    !uploading &&
     size !== "refuse" &&
     (!needsOverride || (view.canOverride && reason.trim().length >= OVERRIDE_REASON_MIN));
 
@@ -54,6 +60,20 @@ export function SendPanel({ view }: { view: DeliverView }) {
       else delete next[id];
       return next;
     });
+  }
+
+  async function addExtra(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const up = await uploadFile(file, { purpose: "document" });
+      if (!up.ok) return setError(up.error);
+      setExtras((prev) => [...prev, { uploadId: up.uploadId, fileName: up.upload.fileName, size: up.upload.size }]);
+    } finally {
+      setUploading(false);
+      if (extraInput.current) extraInput.current.value = "";
+    }
   }
 
   function sendNow() {
@@ -68,12 +88,14 @@ export function SendPanel({ view }: { view: DeliverView }) {
         subject,
         body,
         files: chosen.map((r) => ({ renderId: r.id, fileName: names[r.id] ?? "" })),
+        uploads: extras.map((x) => ({ uploadId: x.uploadId, fileName: x.fileName })),
         overrideReason: needsOverride ? reason : undefined,
       });
       setConfirming(false);
       if (!res.ok) return setError(res.error);
       setDone("Sending. The submission below shows Sent, or the reason it was not, in a moment.");
       setNames({});
+      setExtras([]);
       setReason("");
       router.refresh();
     });
@@ -104,6 +126,9 @@ export function SendPanel({ view }: { view: DeliverView }) {
             <div>Subject: <span className="text-text">{subject}</span></div>
             {chosen.map((r) => (
               <div key={r.id}>File: <span className="text-text">{names[r.id]}</span> · {mb(r.byteSize)}</div>
+            ))}
+            {extras.map((x) => (
+              <div key={x.uploadId}>File: <span className="text-text">{x.fileName}</span> · {mb(x.size)}</div>
             ))}
             <div>Total: {mb(total)}</div>
           </dl>
@@ -163,6 +188,21 @@ export function SendPanel({ view }: { view: DeliverView }) {
                   ) : null}
                 </div>
               ))}
+              {extras.map((x) => (
+                <div key={x.uploadId} className="flex flex-col gap-1 border-t border-layer/10 pt-2">
+                  <span className="flex flex-wrap items-baseline justify-between gap-2 font-body text-[13px] text-text">
+                    Uploaded · {mb(x.size)}
+                    <button type="button" className="font-mono text-[11px] text-cobalt underline-offset-2 hover:underline" onClick={() => setExtras((prev) => prev.filter((p) => p.uploadId !== x.uploadId))}>Remove</button>
+                  </span>
+                  <input className="aur-input" aria-label="File name" maxLength={110} value={x.fileName} onChange={(e) => setExtras((prev) => prev.map((p) => (p.uploadId === x.uploadId ? { ...p, fileName: e.target.value } : p)))} />
+                </div>
+              ))}
+              <div className="border-t border-layer/10 pt-2">
+                <input ref={extraInput} type="file" className="hidden" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.txt" onChange={(e) => void addExtra(e.target.files?.[0])} />
+                <button type="button" className="font-mono text-[11px] text-cobalt underline-offset-2 hover:underline" disabled={uploading} onClick={() => extraInput.current?.click()}>
+                  {uploading ? "Uploading…" : "Add another file (a signed form, a price sheet)"}
+                </button>
+              </div>
               <p className={`font-mono text-[11px] ${size === "ok" ? "text-muted" : size === "warn" ? "text-brass" : "text-red"}`}>
                 Total {mb(total)}
                 {size === "warn" ? ". Above 20 MB: many agency mail systems refuse large messages. Check the RFP’s limit." : ""}

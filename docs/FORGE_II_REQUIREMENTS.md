@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-17, after PR #504 and Phase 6b-1 (this PR).
+Last reviewed 2026-11-17, after PR #505 and Phase 6b-2 (this PR).
 
 ---
 
@@ -141,7 +141,7 @@ Last reviewed 2026-11-17, after PR #504 and Phase 6b-1 (this PR).
 |---|---|---|
 | S-1 | Reviews **Pink, Red, Green, Gold and White Gloves** completed and **formally signed off** by everyone before submission | ✅ #504: the opportunity's Deliver tab shows each colour's sign-off and blocks a submission until all five are signed off; an org admin or the proposal manager may override with an audited reason |
 | S-2 | Option 1: generate a **PDF** the lead submits by email | ✅ #504: Deliver → Record submission keeps a copy of the file sent, with who, when, how and to whom |
-| S-3 | Option 2: **submit by email from the portal**, from an email address assigned to the portal | 🔄 Phase 6b-1 (this PR): Deliver → Send from FORGE emails the chosen files once, from the opportunity's own address on the inbound domain, with the sender copied. Real sends need that domain verified in Resend (owner). Extra uploaded files and the receipt upload follow in 6b-2 |
+| S-3 | Option 2: **submit by email from the portal**, from an email address assigned to the portal | ✅ #505: Deliver → Send from FORGE emails the chosen files once, from the opportunity's own address on the inbound domain, with the sender copied. Real sends need that domain verified in Resend (owner). 🔄 6b-2 (this PR): extra uploaded files on a send, receipts on a submission, and download of the kept copy |
 | S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | 📋 Phase 6c: read from FORGE's Exchange mailbox through Microsoft Graph, as S-6 says |
 | S-5 | Submission through government portals: explore later | 📋 Recorded for later (owner) |
 | S-6 | Suggestions on how to do S-3 and S-4 | 📋 In phase 6's design: one sending domain, a reply address for each opportunity, and replies received in FORGE's Exchange mailbox and read through Microsoft Graph, as the bid inbox does (BL-SCOUT-INBOX; the owner chose Exchange over a separate mail service, 2026-11-06) |

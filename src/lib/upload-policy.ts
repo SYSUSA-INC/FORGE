@@ -22,7 +22,9 @@ export type UploadResourceType =
   | "knowledge_artifact"
   | "proposal_template"
   | "section_chat_attachment"
-  | "plan_agreement";
+  | "plan_agreement"
+  // BL-NAV-LIFECYCLE 6b-2 — a submission's receipt, or an extra file sent with it.
+  | "submission_file";
 
 export type PurposePolicy = {
   maxBytes: number;
@@ -52,7 +54,7 @@ export const UPLOAD_POLICIES: Record<UploadPurpose, PurposePolicy> = {
     formats: ["pdf", "docx", "xlsx", "pptx", "text", "image"],
     transient: false,
     countsTowardQuota: true,
-    claimableAs: ["solicitation", "solicitation_document", "knowledge_artifact", "plan_agreement"],
+    claimableAs: ["solicitation", "solicitation_document", "knowledge_artifact", "plan_agreement", "submission_file"],
   },
   template_docx: {
     maxBytes: 50 * MiB,

@@ -307,3 +307,9 @@ message (Resend returns no RFC Message-ID); 6c routes replies by the
 a network error is retried under the row's idempotency key. A new audit
 action `proposal.submission.send_failed` records a send that did not
 leave.
+
+**As built in 6b-2.** A receipt is attached to a submission already on
+record (sent or recorded), not inside the Record submission form, so a
+confirmation that arrives later can be kept too. Receipts and extra
+files stay at their upload's own key (no second copy); renders are
+copied as before. The download route always serves an attachment.
