@@ -127,7 +127,7 @@ export default async function ProposalOverviewPage({
       <div className="flex flex-col gap-4">
         {/* BL-NEXT-ACTION 5a — the pursuit's next action, proposal side included. */}
         <NextActionPanel opportunityId={p.opportunityId} />
-        <StageAdvancePanel proposalId={p.id} currentStage={p.stage} />
+        <StageAdvancePanel proposalId={p.id} opportunityId={p.opportunityId} currentStage={p.stage} />
 
         <ExportPanel
           proposalId={p.id}

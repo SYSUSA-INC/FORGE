@@ -24,6 +24,8 @@ export const TRIGGER_EVENT_KIND_LABELS: Record<
   opportunity_lost: "Opportunity lost",
   proposal_created: "Proposal created",
   proposal_advanced: "Proposal advanced a stage",
+  // BL-NAV-LIFECYCLE 6a — a submission recorded on the opportunity's Deliver tab.
+  proposal_submitted: "Proposal submitted",
   proposal_section_assigned: "Proposal section assigned",
   // BL-NAV-LIFECYCLE 4b-2 — fired by the daily cron for a section past
   // its due date with no draft (src/lib/section-overdue-cron.ts).

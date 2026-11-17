@@ -20,7 +20,7 @@ developing").
   added to the plan here.
 - ❓ **Owner to decide**: needs an answer before it can be built.
 
-Last reviewed 2026-11-16, after PR #494 and Phase 5c (this PR).
+Last reviewed 2026-11-17, after PR #503 and Phase 6a (this PR).
 
 ---
 
@@ -139,10 +139,10 @@ Last reviewed 2026-11-16, after PR #494 and Phase 5c (this PR).
 
 | ID | Requirement | Status |
 |---|---|---|
-| S-1 | Reviews **Pink, Red, Green, Gold and White Gloves** completed and **formally signed off** by everyone before submission | 🟡 The review rounds include these colours. ⚠️ A formal sign-off gate before submission is added to phase 6 |
-| S-2 | Option 1: generate a **PDF** the lead submits by email | 🟡 The PDF export exists. Phase 6 puts it in Deliver |
+| S-1 | Reviews **Pink, Red, Green, Gold and White Gloves** completed and **formally signed off** by everyone before submission | 🔄 Phase 6a (this PR): the opportunity's Deliver tab shows each colour's sign-off and blocks a submission until all five are signed off; an org admin or the proposal manager may override with an audited reason |
+| S-2 | Option 1: generate a **PDF** the lead submits by email | 🔄 Phase 6a (this PR): Deliver → Record submission keeps a copy of the file sent, with who, when, how and to whom |
 | S-3 | Option 2: **submit by email from the portal**, from an email address assigned to the portal | 📋 Phase 6 |
-| S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | 📋 Phase 6: an inbound provider's webhook |
+| S-4 | A reply to that email **comes back to the portal**, is read and parsed, and is filed on the opportunity, building its history and audit trail | 📋 Phase 6c: read from FORGE's Exchange mailbox through Microsoft Graph, as S-6 says |
 | S-5 | Submission through government portals: explore later | 📋 Recorded for later (owner) |
 | S-6 | Suggestions on how to do S-3 and S-4 | 📋 In phase 6's design: one sending domain, a reply address for each opportunity, and replies received in FORGE's Exchange mailbox and read through Microsoft Graph, as the bid inbox does (BL-SCOUT-INBOX; the owner chose Exchange over a separate mail service, 2026-11-06) |
 

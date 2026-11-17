@@ -43,7 +43,6 @@ import {
 import { getDefaultTemplate } from "@/lib/template-defaults";
 import { noteFrozenChange } from "@/lib/plan-freeze-store";
 import { runInBackground } from "@/lib/background";
-import { runDurable } from "@/lib/jobs";
 import { log } from "@/lib/log";
 
 async function ownsProposal(id: string, organizationId: string) {
@@ -495,31 +494,28 @@ export async function updateWinThemesAction(
 export async function advanceProposalStageAction(
   id: string,
   nextStage: ProposalStage,
-): Promise<{ ok: true; harvestStarted?: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   if (!(await ownsProposal(id, organizationId))) {
     return { ok: false, error: "Proposal not found." };
   }
+  // BL-NAV-LIFECYCLE 6a — a submission is recorded on the opportunity's
+  // Deliver tab (sign-off gate, the file, who and when), which sets this
+  // stage itself. A bare stage click no longer marks a proposal submitted.
+  if (nextStage === "submitted") {
+    return { ok: false, error: "Record the submission on the opportunity's Deliver tab: it marks the proposal submitted." };
+  }
   try {
-    // Detect "transition into submitted" so we only kick off the
-    // harvest when the proposal moves INTO submitted, not on every
-    // touch while already there.
     const [before] = await db
       .select({ stage: proposals.stage })
       .from(proposals)
       .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)))
       .limit(1);
-    const wasNotSubmitted = before && before.stage !== "submitted";
 
     await db
       .update(proposals)
-      .set({
-        stage: nextStage,
-        submittedAt:
-          nextStage === "submitted" ? new Date() : undefined,
-        updatedAt: new Date(),
-      })
+      .set({ stage: nextStage, updatedAt: new Date() })
       .where(and(eq(proposals.id, id), eq(proposals.organizationId, organizationId)));
     await recordAudit({
       organizationId,
@@ -557,23 +553,9 @@ export async function advanceProposalStageAction(
     revalidatePath("/proposals");
     revalidatePath("/");
 
-    // Phase 10f: harvest into the corpus on transition to submitted.
-    // Best-effort, fire-and-forget — failures don't block the stage
-    // change. Users can re-run via the "Harvest now" button.
-    // BL-AIP-4c — a background_job row, retried by the cron if this
-    // instance dies mid-harvest.
-    let harvestStarted = false;
-    if (nextStage === "submitted" && wasNotSubmitted) {
-      harvestStarted = true;
-      await runDurable("[advanceProposalStage] harvest", {
-        organizationId,
-        kind: "proposal_harvest",
-        resourceId: id,
-        requestedByUserId: actor.id,
-      });
-    }
-
-    return { ok: true, harvestStarted };
+    // The harvest into the corpus (Phase 10f) starts when the submission
+    // is recorded: `recordSubmission` in src/lib/deliver-store.ts.
+    return { ok: true };
   } catch (err) {
     log.error("[advanceProposalStageAction]", "error", { error: err });
     return {

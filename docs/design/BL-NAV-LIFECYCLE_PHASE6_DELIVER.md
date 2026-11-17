@@ -1,7 +1,8 @@
 # Phase 6 — Deliver: design for review
 
-**Status:** for the owner's review. Nothing is built; no code follows
-until the decisions in §4 are answered.
+**Status:** approved by the owner (2026-11-17, "all recommended") with
+every recommended answer in §4. 6a is built (migration 0177); 6b to 6d
+follow, one PR each.
 **Requirements:** FORGE II footnote 9, S-1 to S-6 in
 `docs/FORGE_II_REQUIREMENTS.md`. **Plan:** BL-NAV-LIFECYCLE phase 6.
 **Shape:** the same as `BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md`.
@@ -278,3 +279,22 @@ route). S-5 stays recorded for later; S-6 is this document.
 10. **Order.** 6a, 6b, 6c, 6d as above (recommended: 6a alone gives the
     gate and the record)? Or replies (6c) before sending (6b), so mail
     sent by hand with the opportunity's address in Cc is filed first?
+
+**Decided 2026-11-17: all recommended** — the gate blocks, with an
+audited override by an org admin or the proposal manager (1); all five
+colours on every bid, a skipped colour through the override (2); Resend,
+From the opportunity's own address on the inbound subdomain, which the
+owner verifies in Resend before 6b goes live (3); `{Company name} via
+FORGE` with the sender Cc'd (4); replies typed and summarised by FORGE
+AI, suggesting and never acting (5); Reply from the portal in 6d (6);
+org admins, the proposal manager and the capture manager submit (7);
+sections stay editable and the kept files are the record (8); warn
+above 20 MB, refuse above 35 MB, no download links (9); order 6a, 6b,
+6c, 6d (10).
+
+**As built in 6a.** A cancelled round is ignored when reading a colour's
+newest round. The submission pack counts as ticked when any reviewer
+ticked it on the newest White Gloves round. Record submission requires
+one kept render (PDF or Word) as the file; the optional receipt upload
+of §2.3 moves to 6b, which builds the upload of extra files, as does
+downloading the kept copy (the file's name, size and SHA-256 are shown).

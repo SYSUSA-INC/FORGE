@@ -51,6 +51,7 @@ export const ACTIVITY_KIND_LABELS: Record<OpportunityActivityKind, string> = {
   evaluation_update: "Evaluation updated",
   competitor_update: "Competitor",
   owner_change: "Owner change",
+  submission: "Submission",
 };
 
 export const ACTIVITY_KIND_COLORS: Record<OpportunityActivityKind, string> = {
@@ -62,6 +63,7 @@ export const ACTIVITY_KIND_COLORS: Record<OpportunityActivityKind, string> = {
   evaluation_update: THEME.cobalt,
   competitor_update: THEME.plum,
   owner_change: THEME.indigo,
+  submission: THEME.green,
 };
 
 export const MANUAL_ACTIVITY_KINDS: OpportunityActivityKind[] = [

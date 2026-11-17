@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui/Panel";
@@ -9,9 +10,11 @@ import { advanceProposalStageAction } from "../actions";
 
 export function StageAdvancePanel({
   proposalId,
+  opportunityId,
   currentStage,
 }: {
   proposalId: string;
+  opportunityId: string;
   currentStage: ProposalStage;
 }) {
   const router = useRouter();
@@ -21,8 +24,10 @@ export function StageAdvancePanel({
   const next = advanceStage(currentStage);
   const nextDef = next ? STAGES.find((s) => s.key === next) : null;
 
+  // BL-NAV-LIFECYCLE 6a — "submitted" is set by recording the submission
+  // on the opportunity's Deliver tab, never by a click here.
+  const deliverHref = `/opportunities/${opportunityId}/deliver`;
   const terminalStages: ProposalStage[] = [
-    "submitted",
     "awarded",
     "lost",
     "no_bid",
@@ -90,14 +95,20 @@ export function StageAdvancePanel({
             <div className="mt-1 font-mono text-[11px] text-muted">
               {nextDef.description}
             </div>
-            <button
-              type="button"
-              className="aur-btn aur-btn-primary mt-3 w-full text-sm"
-              disabled={pending}
-              onClick={() => doAdvance(next)}
-            >
-              {pending ? "Advancing…" : `Advance to ${nextDef.label}`}
-            </button>
+            {next === "submitted" ? (
+              <Link href={deliverHref} className="aur-btn aur-btn-primary mt-3 w-full text-sm">
+                Submit on the Deliver tab
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="aur-btn aur-btn-primary mt-3 w-full text-sm"
+                disabled={pending}
+                onClick={() => doAdvance(next)}
+              >
+                {pending ? "Advancing…" : `Advance to ${nextDef.label}`}
+              </button>
+            )}
           </div>
         ) : (
           <div className="rounded-md border border-dashed border-layer/10 p-3 font-mono text-[11px] text-muted">
