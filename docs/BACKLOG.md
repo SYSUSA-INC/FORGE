@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is in its own PR; 6b (send from the portal, migration 0178) is next and needs the owner's DNS step: the inbound subdomain verified in Resend.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is in its own PR; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload on Record submission, extra uploaded files on a send) is next, then 6c (replies).
 
 ---
 
@@ -4161,7 +4161,7 @@ Every requirement in the FORGE II document, with its status and phase:
    (the first notes appear after the first Monday run, or when the
    cron is called once by hand). **Phase 5 is complete.**
 
-   **6a shipped** (this PR, migration 0177; design
+   **6a shipped** (#504, migration 0177; design
    `docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md` §2.1 to §2.3; the
    owner's 2026-11-17 answers, all recommended). The opportunity gains a
    **Deliver** tab. **Sign-off** (S-1): one row per colour (Pink, Red,
@@ -4190,6 +4190,37 @@ Every requirement in the FORGE II document, with its status and phase:
    (6b; the chosen render stays downloadable from Export). Also later:
    the receipt upload and sending from the portal (6b), replies (6c),
    Reply and Pipeline → Deliver's two lists (6d).
+
+   **6b-1 shipped** (this PR, migration 0178; design §2.4, FORGE II
+   S-3). **Send from FORGE** on the Deliver tab: To and Cc (the
+   agency's `contracting_officer` contacts suggested), a subject
+   starting with the solicitation number, a plain body, one or more
+   kept renders each under an editable file name, Cc to the sender on
+   by default, the RFP's Section L submission rules and the due date
+   beside the form, and a confirm step. `queueSubmissionSend`
+   (`src/lib/deliver-send.ts`) runs the same checks as Record
+   submission (`submissionContext`), makes the opportunity's address
+   the first time (`opportunity.delivery_local_part`, `sub-` and ten
+   random characters, unique), writes the row as `sending` and starts
+   the new job kind `submission_send`. The job copies each file to
+   `org/{org}/submission/{id}/` with its SHA-256, sends once through
+   `sendEmailTracked` (From `{Company} via FORGE <sub-…@domain>`,
+   Reply-To the same, the row id as Resend's idempotency key), stores
+   the provider's message id, marks the row `sent` and runs
+   `markDelivered`, the tail now shared with `recordSubmission` (stage
+   moves, activity, audit, `proposal_submitted`, harvest). A refusal
+   or a stubbed send marks the row `failed` with the reason and is
+   never retried; a network error is retried under the same key. Size:
+   warn above 20 MB, refuse above 35 MB. Not offered unless
+   `RESEND_API_KEY` and `INBOUND_EMAIL_DOMAIN` are set. Audit:
+   `proposal.submission.sent`, `.send_failed`. Tests:
+   `tests/ai/deliver-logic.test.ts`,
+   `tests/isolation/deliver-send.test.ts`. Known limits: `message_id`
+   holds Resend's id, not the RFC Message-ID header (6c routes replies
+   by the `sub-` address first); a send whose job dies three times
+   with its instance stays `Sending…` (check the Cc copy before
+   sending again). **6b-2 next:** the kept copy's download route, the
+   receipt upload and extra uploaded files (convention 11).
 
 ---
 

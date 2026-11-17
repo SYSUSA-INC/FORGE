@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { OVERRIDE_REASON_MIN, RECORD_METHODS, SIGNOFF_COLOR_LABELS, SUBMISSION_METHOD_LABELS, signoffLine, type ColourSignoff, type RecordMethod } from "@/lib/deliver-logic";
+import { OVERRIDE_REASON_MIN, RECORD_METHODS, SIGNOFF_COLOR_LABELS, SUBMISSION_METHOD_LABELS, SUBMISSION_STATUS_LABELS, signoffLine, type ColourSignoff, type RecordMethod } from "@/lib/deliver-logic";
 import type { DeliverView } from "@/lib/deliver-store";
 import { recordSubmissionAction } from "./actions";
+import { SendPanel } from "./SendPanel";
 
 const STATE_TEXT: Record<ColourSignoff["state"], { label: string; tone: string }> = {
   signed_off: { label: "Signed off", tone: "text-green" },
@@ -35,6 +36,13 @@ export function DeliverClient({ view }: { view: DeliverView }) {
   const [renderId, setRenderId] = useState(view.renders[0]?.id ?? "");
   const [reason, setReason] = useState("");
   const { proposal, gate } = view;
+  // A send runs in a job: look again while one is on its way.
+  const sending = view.submissions.some((s) => s.status === "sending");
+  useEffect(() => {
+    if (!sending) return;
+    const timer = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(timer);
+  }, [sending, router]);
 
   if (!proposal || !gate) {
     return (
@@ -103,7 +111,9 @@ export function DeliverClient({ view }: { view: DeliverView }) {
         </div>
       </Panel>
 
-      <Panel title="Record submission" eyebrow={view.dueDate ? `Due ${view.dueDate}` : "Submit"}>
+      <SendPanel view={view} />
+
+      <Panel title="Record submission" eyebrow="Sent another way">
         <p className="font-body text-[13px] leading-[1.5] text-muted">
           Download the final file, send it yourself (your own email, or the agency&apos;s portal), then record it here. FORGE keeps a copy of the file that was sent and marks the proposal and the opportunity as submitted.
         </p>
@@ -194,14 +204,17 @@ export function DeliverClient({ view }: { view: DeliverView }) {
             {view.submissions.map((s) => (
               <li key={s.id} className="flex flex-col gap-1 py-3">
                 <span className="font-body text-[13px] text-text">
-                  {SUBMISSION_METHOD_LABELS[s.method]} · {when(s.sentAt)} · {s.sentBy}
+                  {SUBMISSION_METHOD_LABELS[s.method]} · {s.sentAt ? when(s.sentAt) : (SUBMISSION_STATUS_LABELS[s.status] ?? s.status)} · {s.sentBy}
                 </span>
-                {s.recipients.length > 0 ? <span className="font-mono text-[11px] text-muted">To {s.recipients.join(", ")}</span> : null}
+                {s.status === "failed" ? <span role="alert" className="font-body text-[13px] text-red">Not sent: {s.error || "the mail service gave no reason"}. Nothing left FORGE; send it again above.</span> : null}
+                {s.subject ? <span className="font-body text-[13px] text-text">{s.subject}</span> : null}
+                {s.recipients.length > 0 ? <span className="font-mono text-[11px] text-muted">To {s.recipients.join(", ")}{s.cc.length > 0 ? ` · Cc ${s.cc.join(", ")}` : ""}</span> : null}
                 {s.note ? <span className="font-body text-[13px] text-muted">{s.note}</span> : null}
                 {s.overrideReason ? <span className="font-body text-[13px] text-brass">Submitted before full sign-off: {s.overrideReason}</span> : null}
                 {s.files.map((f) => (
-                  <span key={f.sha256} className="font-mono text-[11px] text-muted">
-                    {f.fileName} · {mb(f.byteSize)} · SHA-256 {f.sha256.slice(0, 16)}…
+                  <span key={f.fileName} className="font-mono text-[11px] text-muted">
+                    {f.fileName} · {mb(f.byteSize)}
+                    {f.sha256 ? ` · SHA-256 ${f.sha256.slice(0, 16)}…` : ""}
                   </span>
                 ))}
               </li>

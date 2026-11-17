@@ -21,8 +21,9 @@ function getClient(): Resend {
   return client;
 }
 
-export async function sendEmail(opts: {
-  to: string;
+type SendEmailOptions = {
+  to: string | string[];
+  cc?: string[];
   subject: string;
   html: string;
   text?: string;
@@ -32,33 +33,53 @@ export async function sendEmail(opts: {
   replyTo?: string;
   /** BL-NAV-LIFECYCLE 5c — files to attach (the review meeting's .ics). */
   attachments?: { filename: string; content: Buffer; contentType: string }[];
-}): Promise<void> {
+  /** The provider sends one message per key (24 hours), however often the call is repeated. */
+  idempotencyKey?: string;
+};
+
+export async function sendEmail(opts: SendEmailOptions): Promise<void> {
+  await sendEmailTracked(opts);
+}
+
+/**
+ * BL-NAV-LIFECYCLE 6b — `sendEmail`, saying what happened: the provider's
+ * id of the message, or `stubbed` when no key is set and nothing left. A
+ * refusal throws, as in `sendEmail`.
+ */
+export async function sendEmailTracked(opts: SendEmailOptions): Promise<{ stubbed: true } | { stubbed: false; id: string }> {
   if (!apiKey) {
     log.warn("[email]", "RESEND_API_KEY not set — email skipped (stub mode)", {
       subject: opts.subject,
       to: opts.to,
     });
-    return;
+    return { stubbed: true };
   }
   // BL-DOMAIN-FORGEAXI 2 — Resend reports a refused message (an
   // unverified sending domain, a bad address) in `error`, not by
   // throwing. Ignoring it made every refusal look like a sent email.
   const sender = opts.from ?? from;
-  const res = await getClient().emails.send({
+  const message = {
     from: sender,
     to: opts.to,
     subject: opts.subject,
     html: opts.html,
     text: opts.text,
+    ...(opts.cc?.length ? { cc: opts.cc } : {}),
     ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
     ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
-  });
+  };
+  const emails = getClient().emails;
+  const res = opts.idempotencyKey ? await emails.send(message, { idempotencyKey: opts.idempotencyKey }) : await emails.send(message);
   if (res?.error) {
     const message = res.error.message || res.error.name || "the email service refused the message";
     log.error("[email]", "send refused", { subject: opts.subject, from: sender, error: message });
-    throw new Error(/domain/i.test(message) ? `${message} (the sending domain must be verified in Resend)` : message);
+    throw new EmailRefusedError(/domain/i.test(message) ? `${message} (the sending domain must be verified in Resend)` : message);
   }
+  return { stubbed: false, id: res?.data?.id ?? "" };
 }
+
+/** The provider answered and said no (an unverified domain, a bad address): repeating the call cannot help. */
+export class EmailRefusedError extends Error {}
 
 // BL-AUTH-INVITE — the origin and the invite / reset links are built in
 // src/lib/app-url.ts so the "copy link" an admin sees is byte-identical

@@ -6,6 +6,14 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  attachmentFileName,
+  defaultSendSubject,
+  deliveryLocalPart,
+  plainBodyHtml,
+  SEND_MAX_BYTES,
+  SEND_WARN_BYTES,
+  sendFromHeader,
+  sendSize,
   canOverride,
   canSubmit,
   colourSignoff,
@@ -136,5 +144,47 @@ describe("the inputs of Record submission", () => {
     expect(submissionFileName("Acme — Cloud Ops (Vol. 1)", "pdf")).toBe("Acme-Cloud-Ops-Vol-1.pdf");
     expect(submissionFileName("", "docx")).toBe("proposal.docx");
     expect(submissionFileName("../../etc/passwd", "pdf")).toBe("etc-passwd.pdf");
+  });
+});
+
+describe("6b — the rules of Send from FORGE", () => {
+  it("warns above 20 MB and refuses above 35 MB", () => {
+    expect(sendSize(0)).toBe("ok");
+    expect(sendSize(SEND_WARN_BYTES)).toBe("ok");
+    expect(sendSize(SEND_WARN_BYTES + 1)).toBe("warn");
+    expect(sendSize(SEND_MAX_BYTES)).toBe("warn");
+    expect(sendSize(SEND_MAX_BYTES + 1)).toBe("refuse");
+  });
+
+  it("makes the opportunity's local part: sub- and ten letters or digits", () => {
+    const bytes = Uint8Array.from({ length: 32 }, (_, i) => i * 7);
+    expect(deliveryLocalPart(bytes)).toMatch(/^sub-[a-z0-9]{10}$/);
+    expect(deliveryLocalPart(bytes)).toBe(deliveryLocalPart(bytes));
+    // Bytes of 252 and above are skipped, so every character is equally likely.
+    expect(deliveryLocalPart(Uint8Array.from([255, 254, 253, 252, 0, 1, 2, 3, 4, 5, 6, 7, 8, 35]))).toBe("sub-abcdefghi9");
+    expect(() => deliveryLocalPart(new Uint8Array(32).fill(255))).toThrow();
+    expect(() => deliveryLocalPart(new Uint8Array(4))).toThrow();
+  });
+
+  it("writes the From header with the company's name, and nothing that could break it", () => {
+    expect(sendFromHeader("Acme Federal, Inc.", "sub-k3q9x7m2pa@bids.forgeaxi.com")).toBe('"Acme Federal, Inc. via FORGE" <sub-k3q9x7m2pa@bids.forgeaxi.com>');
+    expect(sendFromHeader('Evil" <x@y.z>\r\nBcc: a@b.c', "sub-a@d.com")).toBe('"Evil x@y.z Bcc: a@b.c via FORGE" <sub-a@d.com>');
+    expect(sendFromHeader("", "sub-a@d.com")).toBe('"FORGE" <sub-a@d.com>');
+  });
+
+  it("starts the subject with the solicitation number", () => {
+    expect(defaultSendSubject({ solicitationNumber: "W91-26-R-0007", title: "Cloud Ops", companyName: "Acme" })).toBe("W91-26-R-0007: Proposal submission, Cloud Ops (Acme)");
+    expect(defaultSendSubject({ solicitationNumber: "", title: "Cloud Ops", companyName: "Acme" })).toBe("Proposal submission, Cloud Ops (Acme)");
+  });
+
+  it("keeps the lead's file name safe and gives it the render's extension", () => {
+    expect(attachmentFileName("Volume I - Technical (Final).pdf", "T", "pdf")).toBe("Volume I - Technical (Final).pdf");
+    expect(attachmentFileName("Acme_Vol2.PDF", "T", "docx")).toBe("Acme_Vol2.docx");
+    expect(attachmentFileName("../../etc/passwd", "T", "pdf")).toBe("etc-passwd.pdf");
+    expect(attachmentFileName("   ", "Cloud Ops", "pdf")).toBe("Cloud-Ops.pdf");
+  });
+
+  it("escapes the plain message for the HTML part", () => {
+    expect(plainBodyHtml("a <b> & c\nline two")).toContain("a &lt;b&gt; &amp; c\nline two");
   });
 });

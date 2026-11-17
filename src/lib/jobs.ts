@@ -444,6 +444,8 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   inbound_email_parse: async (job) => (await import("@/lib/inbound-bids")).handleInboundEmailParse(job),
   // BL-SCOUT-FILES — loaded when run: the amendment watch imports this module's callers.
   sam_notice_files: async (job) => (await import("@/lib/sam-notice-files")).handleSamNoticeFiles(job),
+  // BL-NAV-LIFECYCLE 6b — loaded when run: deliver-send queues its own job through this module.
+  submission_send: async (job) => (await import("@/lib/deliver-send")).handleSubmissionSend(job),
 };
 
 /**

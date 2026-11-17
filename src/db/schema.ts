@@ -450,6 +450,9 @@ export const opportunities = pgTable("opportunity", {
   incumbent: text("incumbent").notNull().default(""),
   description: text("description").notNull().default(""),
   pWin: integer("p_win").notNull().default(0),
+  // BL-NAV-LIFECYCLE 6b (drizzle/0178) — the opportunity's own address on the inbound domain
+  // ("sub-" and ten random characters), made the first time a submission is sent from FORGE.
+  deliveryLocalPart: text("delivery_local_part"),
   // BL-SCOUT-AMEND — the amendment watch (drizzle/0145): attachment links
   // and notices already filed, and when SAM.gov was last checked / tried.
   samWatchSeenLinks: jsonb("sam_watch_seen_links").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
@@ -466,6 +469,7 @@ export const opportunities = pgTable("opportunity", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   organizationIdIdx: index("opportunity_organization_id_idx").on(t.organizationId),
+  deliveryLocalPartIdx: uniqueIndex("opportunity_delivery_local_part_idx").on(t.deliveryLocalPart),
 }));
 
 export type Opportunity = typeof opportunities.$inferSelect;
@@ -4942,6 +4946,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "sam_notice_files",
   // BL-NAV-LIFECYCLE 5b-1b — the web research step before "draft all sections" (drizzle/0172).
   "proposal_research",
+  // BL-NAV-LIFECYCLE 6b — a submission sent from the portal, once (drizzle/0178).
+  "submission_send",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [
