@@ -104,6 +104,7 @@ export async function runSectionDraft(input: {
     sectionId: input.sectionId,
     mode: input.mode,
     cite,
+    actorUserId: input.userId,
   });
   if (!prepared.ok) {
     // Nothing was generated — give the request slot back.

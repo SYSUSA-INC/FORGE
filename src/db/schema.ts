@@ -4717,6 +4717,8 @@ export const backgroundJobKindEnum = pgEnum("background_job_kind", [
   "inbound_email_parse",
   // BL-SCOUT-FILES — a new opportunity's SAM.gov attachments, downloaded at once (drizzle/0153).
   "sam_notice_files",
+  // BL-NAV-LIFECYCLE 5b-1b — the web research step before "draft all sections" (drizzle/0172).
+  "proposal_research",
 ]);
 
 export const backgroundJobStatusEnum = pgEnum("background_job_status", [

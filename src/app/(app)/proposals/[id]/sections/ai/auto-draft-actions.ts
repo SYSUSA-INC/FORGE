@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { proposalSections, proposals } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
-import { autoDraftProgress, continueAutoDraft, startAutoDraft } from "@/lib/auto-draft";
+import { autoDraftProgress, continueAutoDraft, researchProgress, startAutoDraft } from "@/lib/auto-draft";
 import { EMPTY_WORD_THRESHOLD, type AutoDraftProgress } from "@/lib/auto-draft-logic";
 
 /**
@@ -101,7 +101,7 @@ export async function startAutoDraftAction(input: {
  */
 export async function autoDraftProgressAction(
   proposalId: string,
-): Promise<{ ok: true; progress: AutoDraftProgress & { titles: Record<string, string> } } | { ok: false; error: string }> {
+): Promise<{ ok: true; progress: AutoDraftProgress & { titles: Record<string, string>; research: Awaited<ReturnType<typeof researchProgress>> } } | { ok: false; error: string }> {
   await requireAuth();
   const { organizationId } = await requireCurrentOrg();
   const [p] = await db
@@ -112,5 +112,7 @@ export async function autoDraftProgressAction(
   if (!p) return { ok: false, error: "Proposal not found." };
   const progress = await autoDraftProgress({ organizationId, proposalId });
   if (progress.queued > 0) await continueAutoDraft({ organizationId, proposalId });
-  return { ok: true, progress };
+  // BL-NAV-LIFECYCLE 5b — how the research step before the drafts stands.
+  const research = await researchProgress({ organizationId, proposalId });
+  return { ok: true, progress: { ...progress, research } };
 }
