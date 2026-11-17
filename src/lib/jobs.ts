@@ -446,6 +446,8 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   sam_notice_files: async (job) => (await import("@/lib/sam-notice-files")).handleSamNoticeFiles(job),
   // BL-NAV-LIFECYCLE 6b — loaded when run: deliver-send queues its own job through this module.
   submission_send: async (job) => (await import("@/lib/deliver-send")).handleSubmissionSend(job),
+  // BL-NAV-LIFECYCLE 6c — loaded when run: correspondence queues its own job through this module.
+  submission_reply_parse: async (job) => (await import("@/lib/correspondence")).handleSubmissionReply(job),
 };
 
 /**

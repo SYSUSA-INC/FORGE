@@ -8,13 +8,16 @@
  * that company's storage, and records the email once (its Internet
  * Message-ID): sender, sender authentication, text preview, links,
  * attachments' names and a first reading of its kind. Mail for an
- * address FORGE doesn't know is left unrouted. The other functions read
+ * address FORGE doesn't know is left unrouted. Mail for an opportunity's
+ * own address (`sub-…`, BL-NAV-LIFECYCLE 6c) is looked for first: it is
+ * kept the same way as a `proposal_reply`, tied to the opportunity, and
+ * read by the reply job, not the bid reader. The other functions read
  * and create a company's address; callers own auth. Server-only.
  */
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { inboundAddresses, inboundEmails, organizations, type InboundEmail } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
@@ -31,6 +34,7 @@ import {
   senderAuth,
   type InboundMessage,
 } from "@/lib/inbound-email-logic";
+import { queueReplyRead, routeReply } from "@/lib/correspondence";
 import { queueInboundRead } from "@/lib/inbound-bids";
 import { log } from "@/lib/log";
 import { getStorageProvider } from "@/lib/storage";
@@ -50,8 +54,11 @@ export async function receiveInboundMessage(msg: Omit<InboundMessage, "attachmen
   const mailbox = inboundMailbox();
   if (!domain) return { status: "unrouted", reason: "INBOUND_EMAIL_DOMAIN is not set" };
   // The first recipient that names a live company address.
-  let address: { id: string; organizationId: string; to: string } | null = null;
-  for (const r of recipientsOf(msg)) {
+  let address: { id: string | null; organizationId: string; to: string } | null = null;
+  // BL-NAV-LIFECYCLE 6c — an opportunity's own address first: a reply to a submission.
+  const reply = await routeReply({ recipients: recipientsOf(msg), from: msg.from, domain, mailbox });
+  if (reply) address = { id: null, organizationId: reply.organizationId, to: reply.to };
+  for (const r of reply ? [] : recipientsOf(msg)) {
     const local = companyLocalPart(r, { domain, mailbox });
     if (!local) continue;
     const [row] = await db
@@ -109,7 +116,9 @@ export async function receiveInboundMessage(msg: Omit<InboundMessage, "attachmen
       spf: auth.spf,
       dkim: auth.dkim,
       authenticated: auth.authenticated,
-      kind: classifyInbound(msg.subject, text),
+      kind: reply ? "proposal_reply" : classifyInbound(msg.subject, text),
+      opportunityId: reply?.opportunityId ?? null,
+      submissionId: reply?.submissionId ?? null,
       status: "received",
       storagePath,
       rawSize,
@@ -129,8 +138,12 @@ export async function receiveInboundMessage(msg: Omit<InboundMessage, "attachmen
     action: "inbound_email.receive",
     resourceType: "inbound_email",
     resourceId: id,
-    metadata: { from, authenticated: auth.authenticated, attachments: attachments.length, size: rawSize },
+    metadata: { from, authenticated: auth.authenticated, attachments: attachments.length, size: rawSize, ...(reply ? { opportunityId: reply.opportunityId } : {}) },
   }).catch((err) => log.warn("[inbound-email]", "audit failed", { organizationId, error: err }));
+  if (reply) {
+    await queueReplyRead(organizationId, id).catch((err) => log.warn("[inbound-email]", "reply read not queued", { organizationId, emailId: id, error: err }));
+    return { status: "stored", organizationId, emailId: id };
+  }
   // BL-SCOUT-INBOX phase 2 — read its bids in the background (an unverified sender is held there).
   await queueInboundRead(organizationId, id, classifyInbound(msg.subject, text)).catch((err) => log.warn("[inbound-email]", "read not queued", { organizationId, emailId: id, error: err }));
   return { status: "stored", organizationId, emailId: id };
@@ -173,7 +186,8 @@ export async function createInboundAddress(input: { organizationId: string; acto
   return { ok: false, error: "Could not create the address; try again." };
 }
 
-export type InboundEmailView = Pick<InboundEmail, "id" | "fromAddress" | "fromName" | "subject" | "kind" | "status" | "authenticated" | "bidsFound" | "links" | "error"> & {
+export type InboundEmailView = Pick<InboundEmail, "id" | "fromAddress" | "fromName" | "subject" | "status" | "authenticated" | "bidsFound" | "links" | "error"> & {
+  kind: Exclude<InboundEmail["kind"], "proposal_reply">;
   receivedAt: string;
   preview: string;
   attachments: number;
@@ -184,7 +198,7 @@ export async function listInboundEmails(organizationId: string, limit = 50): Pro
   const rows = await db
     .select()
     .from(inboundEmails)
-    .where(eq(inboundEmails.organizationId, organizationId))
+    .where(and(eq(inboundEmails.organizationId, organizationId), ne(inboundEmails.kind, "proposal_reply")))
     .orderBy(desc(inboundEmails.receivedAt))
     .limit(limit);
   return rows.map((r) => ({
@@ -192,7 +206,7 @@ export async function listInboundEmails(organizationId: string, limit = 50): Pro
     fromAddress: r.fromAddress,
     fromName: r.fromName,
     subject: r.subject,
-    kind: r.kind,
+    kind: r.kind === "proposal_reply" ? "other" : r.kind,
     status: r.status,
     authenticated: r.authenticated,
     bidsFound: r.bidsFound,

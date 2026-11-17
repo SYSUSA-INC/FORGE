@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { getComplianceGateStatus } from "@/lib/compliance-gate";
+import { listReplies, type DeliverReply } from "@/lib/correspondence";
 import { agencyKey } from "@/lib/crm-logic";
 import {
   canOverride,
@@ -91,6 +92,8 @@ export type DeliverView = {
   gate: SignoffGate | null;
   renders: DeliverRender[];
   submissions: DeliverSubmission[];
+  /** 6c — the replies filed to this opportunity's own address, oldest first. */
+  replies: DeliverReply[];
   canSubmit: boolean;
   canOverride: boolean;
   /** Send from FORGE (6b): whether it is set up, and what the form starts with. */
@@ -241,10 +244,11 @@ export async function loadDeliver(input: { organizationId: string; opportunityId
   if (!opp) return null;
   const proposal = await proposalOf(organizationId, opportunityId);
   const key = agencyKey(opp.agency);
-  const [gate, renders, submissions, [org], contacts, sols] = await Promise.all([
+  const [gate, renders, submissions, replies, [org], contacts, sols] = await Promise.all([
     proposal ? signoffFor(organizationId, proposal.id) : Promise.resolve(null),
     proposal ? rendersOf(organizationId, proposal.id) : Promise.resolve([]),
     listSubmissions(organizationId, opportunityId),
+    listReplies(organizationId, opportunityId),
     db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, organizationId)).limit(1),
     key
       ? db
@@ -269,6 +273,7 @@ export async function loadDeliver(input: { organizationId: string; opportunityId
     gate,
     renders: renders.map((r) => ({ id: r.id, contentType: r.contentType, byteSize: r.byteSize, pageCount: r.pageCount, renderedAt: r.renderedAt.toISOString() })),
     submissions,
+    replies,
     canSubmit: !!proposal && canSubmit(user, proposal),
     canOverride: !!proposal && canOverride(user, proposal),
     send: {

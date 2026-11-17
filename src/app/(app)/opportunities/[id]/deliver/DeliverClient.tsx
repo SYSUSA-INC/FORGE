@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { OVERRIDE_REASON_MIN, RECORD_METHODS, SIGNOFF_COLOR_LABELS, SUBMISSION_METHOD_LABELS, SUBMISSION_STATUS_LABELS, signoffLine, type ColourSignoff, type RecordMethod } from "@/lib/deliver-logic";
 import type { DeliverView } from "@/lib/deliver-store";
 import { recordSubmissionAction } from "./actions";
+import { Correspondence } from "./Correspondence";
 import { ReceiptUpload } from "./ReceiptUpload";
 import { SendPanel } from "./SendPanel";
 
@@ -230,6 +231,8 @@ export function DeliverClient({ view }: { view: DeliverView }) {
           </ul>
         )}
       </Panel>
+
+      <Correspondence view={view} />
     </div>
   );
 }
