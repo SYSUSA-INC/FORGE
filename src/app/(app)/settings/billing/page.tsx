@@ -12,6 +12,7 @@ import { getCurrentTier } from "@/lib/subscription-gates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { AddonsSection } from "./AddonsSection";
+import { SearchPacksSection } from "./SearchPacksSection";
 import { BillingActionsClient } from "./BillingActionsClient";
 import { ManagePortalButton } from "./ManagePortalButton";
 
@@ -297,6 +298,9 @@ export default async function BillingPage({
         tier={tier}
         planSubscriptionId={current?.stripeSubscriptionId ?? null}
       />
+
+      {/* BL-NAV-LIFECYCLE 5b-2b — prepaid web-search packs */}
+      <SearchPacksSection organizationId={organizationId} isAdmin={isAdmin} tier={tier} />
     </>
   );
 }
@@ -316,6 +320,13 @@ function readFlash(
       tone: "ok",
       message:
         "Checkout complete — your add-on will show as active within a few seconds.",
+    };
+  }
+  if (searchParams.checkout === "pack-success") {
+    return {
+      tone: "ok",
+      message:
+        "Payment complete — your pack searches will show below within a minute.",
     };
   }
   if (searchParams.checkout === "cancelled") {

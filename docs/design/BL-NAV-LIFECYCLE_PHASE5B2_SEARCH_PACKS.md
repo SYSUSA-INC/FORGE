@@ -1,8 +1,10 @@
 # Phase 5b-2 — Prepaid search packs: design for review
 
 **Status:** approved by the owner (2026-11-17, "all recommended") with
-every recommended answer in §4. 5b-2a (the balance, the ledger, the draw)
-is built; 5b-2b (buying) follows. Background: the owner already
+every recommended answer in §4. Built: 5b-2a (#499: the balance, the
+ledger, the draw) and 5b-2b (buying, the webhook, refunds). One addition
+to §2.2: a purchase entry keeps its Stripe payment intent (migration
+0174) so a refund finds it. Background: the owner already
 chose the model (2026-11-16): **prepaid credit packs through Stripe
 Checkout**, not metered card-on-file billing. Searches draw the pack
 down, research pauses at zero, no overage, no dunning.

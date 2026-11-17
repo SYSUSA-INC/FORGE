@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (the balance, the ledger and the draw, migration 0173) is in its own PR; 5b-2b (Checkout, the webhook, refunds, the Billing page) follows once it merges. 5d comes last.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) is merged; 5b-2b (Checkout, the webhook, refunds, the Billing page, migration 0174) is in its own PR. 5d (learning) comes last.
 
 ---
 
@@ -4079,7 +4079,7 @@ Every requirement in the FORGE II document, with its status and phase:
    present. The Auto-draft dialog shows the research line. Tests: the run,
    the wait and the queueing in `tests/isolation/research.test.ts`.
 
-   **5b-2a shipped** (this PR, migration 0173). `search_pack` (the
+   **5b-2a shipped** (#499, migration 0173). `search_pack` (the
    catalogue, seeded with 500 searches for $25; unused until 5b-2b),
    `tenant_search_credit` (one balance per tenant, `CHECK (balance >= 0)`)
    and `search_credit_entry` (append-only ledger; a unique Checkout
@@ -4094,7 +4094,24 @@ Every requirement in the FORGE II document, with its status and phase:
    `getWebSearchAllowance` adds `packBalance` and `available`; Auto-draft
    queues research when either is left. The AI and Search panel shows the
    pack line when a balance is held; `/admin/orgs/[id]` has the correction
-   control. No way to buy yet. Tests: `tests/isolation/search-credits.test.ts`.
+   control. Tests: `tests/isolation/search-credits.test.ts`.
+
+   **5b-2b shipped** (this PR, migration 0174: `stripe_payment_intent_id`
+   on the ledger). `createSearchPackCheckoutAction` (org admin, plan with
+   Auto-draft; Checkout `mode: "payment"`, card only, the catalogue price
+   inline; audit `billing.search_pack.checkout_start`). The webhook's
+   `checkout.session.completed` gets a `search_pack` branch
+   (`creditSearchPackPurchase`: paid sessions only, searches from the
+   catalogue, once per Checkout session id, a session naming another
+   tenant refused; audit `billing.search_pack.credited`) and handles
+   `charge.refunded` (`refundSearchPackPurchase`: the refunded share of
+   the pack, capped by the balance, found by payment intent; audit
+   `billing.search_pack.refunded`). Settings → Billing gains **Web search
+   packs**; AI and Search links to it; the research skip note says where
+   to buy. Owner: add `charge.refunded` to the Stripe webhook endpoint's
+   events. No admin screen for the catalogue yet (edit `search_pack`).
+   Tests: `tests/stripe/search-pack.test.ts`,
+   `tests/ai/search-pack-logic.test.ts`.
 
 ---
 

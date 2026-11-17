@@ -13,6 +13,8 @@ import { requireAuth, requireCurrentOrg, requireOrgAdmin } from "@/lib/auth-help
 import { endGrantNow, getAddonBySlug, getTenantGrant, listAddonCatalog, provisionStripeAddon, setGrantQuantity, type AddonCatalogRow } from "@/lib/addons";
 import { ADDON_LIMITS, addonStacks, canBillOnPlan, sanitizeAddonQuantity, splitSubscriptionItems } from "@/lib/addons-logic";
 import { getStripeClient } from "@/lib/stripe";
+import { getSearchPack } from "@/lib/search-credits";
+import { ensureFeature, FeatureGateError } from "@/lib/subscription-gates";
 import { recordAudit } from "@/lib/audit-log";
 import { log } from "@/lib/log";
 
@@ -640,4 +642,87 @@ export async function getBillingSummary(): Promise<{
     status: row?.status ?? null,
     currentPeriodEnd: row?.currentPeriodEnd?.toISOString() ?? null,
   };
+}
+
+/**
+ * BL-NAV-LIFECYCLE 5b-2b — buy a prepaid pack of web searches: a one-time
+ * card payment through Stripe Checkout. The price comes from FORGE's own
+ * catalogue and is sent inline, so nothing is set up in Stripe per pack.
+ * The webhook credits the pack when the session completes paid. Org
+ * admins only, on a plan that includes Auto-draft (research runs there).
+ */
+export async function createSearchPackCheckoutAction(input: { packSlug: string }): Promise<CheckoutSessionResult> {
+  const actor = await requireAuth();
+  const { organizationId } = await requireCurrentOrg();
+  await requireOrgAdmin(organizationId);
+
+  const pack = await getSearchPack(String(input.packSlug ?? ""));
+  if (!pack || !pack.active) return { ok: false, error: "That pack is no longer available." };
+  try {
+    await ensureFeature(organizationId, "aiAutoDraft");
+  } catch (err) {
+    if (err instanceof FeatureGateError) {
+      return { ok: false, error: "Web research runs with Auto-draft, which your plan does not include. Upgrade the plan first." };
+    }
+    throw err;
+  }
+
+  const [orgRow] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+  if (!orgRow) return { ok: false, error: "Could not load your organization." };
+  const [subRow] = await db
+    .select({ stripeCustomerId: tenantSubscriptions.stripeCustomerId })
+    .from(tenantSubscriptions)
+    .where(eq(tenantSubscriptions.organizationId, organizationId))
+    .limit(1);
+
+  let stripe;
+  try {
+    stripe = getStripeClient();
+  } catch (err) {
+    log.error("[createSearchPackCheckoutAction]", "stripe client unavailable", { error: err instanceof Error ? err.message : String(err) });
+    return { ok: false, error: "Checkout is not configured for this environment. Contact support if this is unexpected." };
+  }
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://app.forge.app").replace(/\/$/, "");
+  const metadata = { organizationId, organizationName: orgRow.name, kind: "search_pack", packSlug: pack.slug, searches: String(pack.searches) };
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      // Card only: the payment is settled when the session completes, so the pack is credited at once.
+      payment_method_types: ["card"],
+      ...(subRow?.stripeCustomerId
+        ? { customer: subRow.stripeCustomerId }
+        : { customer_email: actor.email ?? undefined, customer_creation: "always" as const }),
+      client_reference_id: organizationId,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: pack.currency,
+            unit_amount: pack.priceCents,
+            product_data: { name: `FORGE ${pack.name}`, description: "Prepaid web searches for proposal research. Used after your plan's monthly searches; no expiry." },
+          },
+        },
+      ],
+      billing_address_collection: "auto",
+      success_url: `${appUrl}/settings/billing?checkout=pack-success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/settings/billing?checkout=cancelled`,
+      metadata,
+      payment_intent_data: { metadata },
+    });
+    if (!session.url) return { ok: false, error: "Stripe didn't return a checkout URL — try again." };
+    await recordAudit({
+      organizationId,
+      actor: { userId: actor.id, email: actor.email },
+      action: "billing.search_pack.checkout_start",
+      resourceType: "organization",
+      resourceId: organizationId,
+      metadata: { packSlug: pack.slug, searches: pack.searches, priceCents: pack.priceCents, sessionId: session.id },
+    });
+    return { ok: true, url: session.url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("[createSearchPackCheckoutAction]", "stripe session create failed", { organizationId, packSlug: pack.slug, error: message });
+    return { ok: false, error: `Could not start checkout: ${message.slice(0, 200)}` };
+  }
 }
