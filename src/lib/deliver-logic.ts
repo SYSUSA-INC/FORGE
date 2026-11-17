@@ -230,6 +230,21 @@ export function uploadedFileName(typed: string, original: string): string {
 
 export const RECEIPTS_MAX = 5;
 
+/**
+ * One entry of `proposal_submission.files` as 6b-2 writes it: `extra` is
+ * an uploaded file sent with the renders, `receipt` one attached
+ * afterwards (both stay at their upload's own key); absent for a render.
+ */
+export type SubmissionFile = {
+  kind?: "extra" | "receipt";
+  renderId: string | null;
+  fileName: string;
+  storagePath: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+};
+
 /** The plain message as the HTML part: escaped, line breaks kept. */
 export function plainBodyHtml(text: string): string {
   const escaped = String(text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

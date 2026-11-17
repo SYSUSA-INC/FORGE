@@ -17,7 +17,6 @@ import {
   solicitations,
   users,
   type ProposalStage,
-  type ProposalSubmissionFile,
 } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { getComplianceGateStatus } from "@/lib/compliance-gate";
@@ -39,6 +38,7 @@ import {
   type RecordMethod,
   type SignoffGate,
   type SignoffRound,
+  type SubmissionFile,
 } from "@/lib/deliver-logic";
 import { emailConfigured } from "@/lib/email";
 import { inboundDomain } from "@/lib/inbound-email-logic";
@@ -226,7 +226,7 @@ export async function listSubmissions(organizationId: string, opportunityId: str
     error: r.error,
     note: r.note,
     overrideReason: r.overrideReason,
-    files: (r.files ?? []).map((f) => ({ kind: f.kind ?? "proposal", fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256, kept: f.sha256 !== "" })),
+    files: ((r.files ?? []) as SubmissionFile[]).map((f) => ({ kind: f.kind ?? "proposal", fileName: f.fileName, byteSize: f.byteSize, sha256: f.sha256, kept: f.sha256 !== "" })),
   }));
 }
 
@@ -346,7 +346,7 @@ export async function markDelivered(d: {
   now: Date;
   recipients: string[];
   note: string;
-  files: ProposalSubmissionFile[];
+  files: SubmissionFile[];
   overridden: boolean;
   auditAction: "proposal.submission.recorded" | "proposal.submission.sent";
   auditMetadata: Record<string, unknown>;
@@ -455,7 +455,7 @@ export async function recordSubmission(input: RecordSubmissionInput): Promise<Re
 
   const submissionId = randomUUID();
   const fileName = submissionFileName(proposal.title, render.contentType);
-  const file: ProposalSubmissionFile = {
+  const file: SubmissionFile = {
     renderId: render.id,
     fileName,
     storagePath: `org/${organizationId}/submission/${submissionId}/${fileName}`,
@@ -509,7 +509,7 @@ export async function readSubmissionFile(i: { organizationId: string; opportunit
     .from(proposalSubmissions)
     .where(and(eq(proposalSubmissions.id, i.submissionId), eq(proposalSubmissions.organizationId, i.organizationId), eq(proposalSubmissions.opportunityId, i.opportunityId)))
     .limit(1);
-  const file = row?.files?.[i.index];
+  const file = (row?.files as SubmissionFile[] | undefined)?.[i.index];
   if (!row || !file || !file.sha256 || !file.storagePath.startsWith(`org/${i.organizationId}/`)) return null;
   const object = await getStorageProvider().get(file.storagePath);
   return { proposalId: row.proposalId, file, object };
@@ -536,7 +536,7 @@ export async function attachSubmissionReceipt(i: { organizationId: string; oppor
     .limit(1);
   if (!leads || !canSubmit(user, leads)) return { ok: false, error: "Only an org admin, the proposal manager or the capture manager can attach a receipt." };
   if (row.status !== "sent" && row.status !== "recorded") return { ok: false, error: "A receipt is attached once the submission has been sent or recorded." };
-  const files = row.files ?? [];
+  const files: SubmissionFile[] = row.files ?? [];
   if (files.filter((f) => f.kind === "receipt").length >= RECEIPTS_MAX) return { ok: false, error: `At most ${RECEIPTS_MAX} receipts on one submission.` };
 
   const claim = await claimUpload({ organizationId, userId: user.id, uploadId: String(i.uploadId ?? ""), resourceType: "submission_file", resourceId: submissionId });
@@ -552,7 +552,7 @@ export async function attachSubmissionReceipt(i: { organizationId: string; oppor
     }
     let fileName = uploadedFileName("", up.fileName);
     if (files.some((f) => f.fileName.toLowerCase() === fileName.toLowerCase())) fileName = `receipt-${Date.now()}-${fileName}`;
-    const file: ProposalSubmissionFile = {
+    const file: SubmissionFile = {
       kind: "receipt",
       renderId: null,
       fileName,

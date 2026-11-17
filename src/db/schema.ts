@@ -2820,8 +2820,6 @@ export const proposalSubmissionStatusEnum = pgEnum("proposal_submission_status",
 
 /** One file of a submission (`proposal_submission.files`): the kept copy under org/{org}/submission/{id}/. */
 export type ProposalSubmissionFile = {
-  /** 6b-2: `extra` is an uploaded file sent with the renders, `receipt` one attached afterwards; absent for a render. Both live at their upload's own key. */
-  kind?: "extra" | "receipt";
   renderId: string | null;
   fileName: string;
   storagePath: string;

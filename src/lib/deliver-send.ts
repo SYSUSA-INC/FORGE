@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { opportunities, organizations, proposalPdfRenders, proposalSubmissions, users, type BackgroundJob, type ProposalSubmissionFile } from "@/db/schema";
+import { opportunities, organizations, proposalPdfRenders, proposalSubmissions, users, type BackgroundJob } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import {
   attachmentFileName,
@@ -14,6 +14,7 @@ import {
   SEND_MAX_FILES,
   sendFromHeader,
   snapshotOf,
+  type SubmissionFile,
   uploadedFileName,
 } from "@/lib/deliver-logic";
 import { auditGateOverride, markDelivered, rendersOf, sendConfigured, submissionContext, type DeliverUser } from "@/lib/deliver-store";
@@ -110,7 +111,7 @@ export async function queueSubmissionSend(input: SendSubmissionInput): Promise<S
   if (chosen.length + uploads.length > SEND_MAX_FILES) return { ok: false, error: `At most ${SEND_MAX_FILES} files.` };
   const renders = await rendersOf(organizationId, proposal.id);
   const submissionId = randomUUID();
-  const files: ProposalSubmissionFile[] = [];
+  const files: SubmissionFile[] = [];
   for (const c of chosen) {
     const render = renders.find((r) => r.id === String(c?.renderId ?? ""));
     if (!render) return { ok: false, error: "One of the chosen files is not a render of this proposal. Choose the files again." };
@@ -197,9 +198,9 @@ export async function handleSubmissionSend(job: BackgroundJob): Promise<void> {
   if (!sendConfigured() || !row.fromAddress) await fail(NOT_SET_UP);
 
   const storage = getStorageProvider();
-  const files: ProposalSubmissionFile[] = [];
+  const files: SubmissionFile[] = [];
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
-  for (const f of row.files ?? []) {
+  for (const f of (row.files ?? []) as SubmissionFile[]) {
     // A retried job finds the copy it already made; an uploaded extra is already at its own key.
     let object = await storage.get(f.storagePath);
     if (!object) {
