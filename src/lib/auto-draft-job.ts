@@ -10,6 +10,8 @@
  *     as FORGE AI tracked changes on top of it instead of replacing it;
  *   - marks a draft cut off at the output limit so nobody mistakes it
  *     for finished;
+ *   - keeps the text it wrote as an `ai_draft` snapshot, so the final
+ *     text can be compared with it (BL-NAV-LIFECYCLE 5d);
  *   - flags the proposal for a background health scan.
  */
 import "server-only";
@@ -19,7 +21,9 @@ import { db } from "@/db";
 import { backgroundJobs, proposalSectionSnapshots, proposalSections, proposals, type BackgroundJob, type TipTapDoc } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { EMPTY_WORD_THRESHOLD, withTruncationNote } from "@/lib/auto-draft-logic";
+import { recordAiDraftSnapshot } from "@/lib/draft-learning";
 import { JobPermanentError, JobWaitError } from "@/lib/jobs-policy";
+import { log } from "@/lib/log";
 import { markScanDirty } from "@/lib/proposal-scan-dirty";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { runSectionDraft } from "@/lib/section-draft-run";
@@ -113,6 +117,14 @@ export async function handleSectionAutoDraft(job: BackgroundJob): Promise<void> 
     .update(proposalSections)
     .set({ bodyDoc: doc, content: projectToPlain(doc), wordCount, status: "in_progress", updatedAt: new Date() })
     .where(and(eq(proposalSections.id, section.id), eq(proposalSections.proposalId, proposalId)));
+
+  // BL-NAV-LIFECYCLE 5d — the AI's own text, before anyone edits it. Best-effort:
+  // the draft is already in the section and must not be retried over this.
+  try {
+    await recordAiDraftSnapshot({ organizationId, proposalId, sectionId: section.id, draftText: draft.text, requestedByUserId: job.requestedByUserId });
+  } catch (err) {
+    log.warn("[auto-draft]", "ai_draft snapshot failed", { sectionId: section.id, error: err });
+  }
 
   await markScanDirty(proposalId, organizationId);
   await recordOutcome({ truncated: !!draft.truncated, tracked: hasText, wordCount });

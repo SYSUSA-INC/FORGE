@@ -1,6 +1,8 @@
 import { Panel } from "@/components/ui/Panel";
 import { getDraftInsightsAction } from "./draft-insights-actions";
+import { REVIEW_COLOR_LABELS } from "@/lib/review-types";
 import { withAlpha, THEME } from "@/lib/theme-colors";
+import type { ReviewColor } from "@/db/schema";
 
 const KIND_LABELS: Record<string, string> = {
   executive_summary: "Exec. Summary",
@@ -10,6 +12,10 @@ const KIND_LABELS: Record<string, string> = {
   pricing: "Pricing",
   compliance: "Compliance",
 };
+
+function colorLabel(color: string): string {
+  return REVIEW_COLOR_LABELS[color as ReviewColor] ?? color;
+}
 
 function fractionBadge(fraction: number | null) {
   if (fraction === null) return null;
@@ -40,7 +46,9 @@ export async function DraftInsightsPanel({
     !result.ok ||
     (result.data.totalDrafts === 0 &&
       result.data.editDecisions.total === 0 &&
-      result.data.editDecisions.aiDecisions === 0)
+      result.data.editDecisions.aiDecisions === 0 &&
+      result.data.retention.now === null &&
+      result.data.retention.reviews.length === 0)
   ) {
     return null;
   }
@@ -91,6 +99,68 @@ export async function DraftInsightsPanel({
                 </div>
               ))}
             </div>
+          </div>
+        ) : null}
+
+        {/* BL-NAV-LIFECYCLE 5d — the AI's first draft, through each review */}
+        {data.retention.now || data.retention.reviews.length > 0 ? (
+          <div className="flex flex-col gap-1.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <span className="font-body text-[12px] text-muted">
+              AI first draft kept, through each review
+            </span>
+            <ul className="flex flex-col gap-1">
+              {data.retention.reviews.map((r) => (
+                <li key={r.reviewId} className="flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
+                  <span>
+                    At {colorLabel(r.color)}
+                    {r.startedAt ? ` · ${new Date(r.startedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    {fractionBadge(r.keptShare)}
+                    <span className="text-subtle">
+                      {r.sections} section{r.sections !== 1 ? "s" : ""}
+                    </span>
+                  </span>
+                </li>
+              ))}
+              {data.retention.now ? (
+                <li className="flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
+                  <span>Now</span>
+                  <span className="flex items-center gap-1.5">
+                    {fractionBadge(data.retention.now.keptShare)}
+                    <span className="text-subtle">
+                      {data.retention.now.sections} section{data.retention.now.sections !== 1 ? "s" : ""}
+                    </span>
+                  </span>
+                </li>
+              ) : null}
+            </ul>
+            <p className="font-body text-[11px] leading-relaxed text-subtle">
+              For sections Auto-draft wrote: how much of that draft was still
+              in the text when each review round started, weighted by the
+              length of each draft. The draft itself is kept in the
+              section&apos;s Snapshots as &quot;AI draft&quot;.
+            </p>
+          </div>
+        ) : null}
+
+        {/* BL-NAV-LIFECYCLE 5d — reviewers' tracked suggestions, by colour team */}
+        {data.reviewerDecisions.length > 0 ? (
+          <div className="flex flex-col gap-1.5 rounded-md border border-layer/10 bg-layer/[0.02] px-3 py-2">
+            <span className="font-body text-[12px] text-muted">
+              Reviewers&apos; suggestions accepted
+            </span>
+            <ul className="flex flex-col gap-1">
+              {data.reviewerDecisions.map((r) => (
+                <li key={r.color} className="flex items-center justify-between gap-2 font-mono text-[10px] text-muted">
+                  <span>{colorLabel(r.color)}</span>
+                  <span className="flex items-center gap-1.5">
+                    {fractionBadge(r.acceptRate)}
+                    <span className="text-subtle">{r.decided} decided</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
 

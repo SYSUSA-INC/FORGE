@@ -220,7 +220,9 @@ function SnapshotRow({
   onDelete: () => void;
   onDiff: () => void;
 }) {
-  const isAuto = snapshot.kind === "auto";
+  // An AI draft (BL-NAV-LIFECYCLE 5d) reads like a checkpoint and cannot be deleted.
+  const isAiDraft = snapshot.kind === "ai_draft";
+  const isAuto = snapshot.kind === "auto" || isAiDraft;
   const created = formatTimeAgo(new Date(snapshot.createdAt).getTime());
   const author = snapshot.createdByName || "Unknown";
 
@@ -244,7 +246,7 @@ function SnapshotRow({
                   }
             }
           >
-            {isAuto ? "auto" : "manual"}
+            {isAiDraft ? "AI draft" : isAuto ? "auto" : "manual"}
           </span>
           <span className="truncate font-mono text-[10px] text-text">
             {snapshot.label || (isAuto ? "checkpoint" : "manual snapshot")}
@@ -269,14 +271,16 @@ function SnapshotRow({
               >
                 Restore
               </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                title="Delete this snapshot"
-                className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
-              >
-                ✕
-              </button>
+              {isAiDraft ? null : (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  title="Delete this snapshot"
+                  className="rounded border border-rose/30 bg-rose/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose hover:bg-rose/20 transition-colors"
+                >
+                  ✕
+                </button>
+              )}
             </>
           )}
         </div>

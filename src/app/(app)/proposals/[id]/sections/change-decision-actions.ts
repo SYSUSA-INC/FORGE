@@ -14,6 +14,9 @@
  * rule the editor applies (section author, an ownerless section, or an
  * org admin). A mismatch is audited and refused; it never throws into
  * the editor.
+ *
+ * BL-NAV-LIFECYCLE 5d — a suggestion whose author was a reviewer on one
+ * of the proposal's colour-team rounds keeps that round and its colour.
  */
 
 import { and, eq } from "drizzle-orm";
@@ -22,6 +25,7 @@ import { db } from "@/db";
 import { proposalSections, proposals, sectionChangeDecisions } from "@/db/schema";
 import { requireAuth, requireCurrentOrg } from "@/lib/auth-helpers";
 import { recordAudit } from "@/lib/audit-log";
+import { reviewRoundsForAuthors } from "@/lib/draft-learning";
 import { countWords } from "@/lib/edit-feedback-summary";
 import { log } from "@/lib/log";
 
@@ -88,6 +92,14 @@ export async function recordChangeDecisionsAction(input: {
   if (clean.length === 0) return { ok: false, error: "No valid decisions." };
   const bulk = Boolean(input.bulk);
 
+  // Best-effort: a decision is recorded without its round rather than lost.
+  let rounds = new Map<string, { reviewId: string; color: string }>();
+  try {
+    rounds = await reviewRoundsForAuthors({ organizationId, proposalId: input.proposalId, authorIds: clean.map((d) => d.authorId) });
+  } catch (err) {
+    log.warn("[recordChangeDecisionsAction]", "review round lookup failed", { error: err });
+  }
+
   try {
     await db.insert(sectionChangeDecisions).values(
       clean.map((d) => ({
@@ -104,6 +116,8 @@ export async function recordChangeDecisionsAction(input: {
         decidedByUserId: actor.id,
         changeText: d.text,
         wordCount: countWords(d.text),
+        reviewId: rounds.get(d.authorId)?.reviewId ?? null,
+        reviewColor: rounds.get(d.authorId)?.color ?? null,
       })),
     );
   } catch (err) {
@@ -122,6 +136,7 @@ export async function recordChangeDecisionsAction(input: {
       accepted,
       rejected: clean.length - accepted,
       bulk,
+      fromReviewers: clean.filter((d) => rounds.has(d.authorId)).length,
       changeIds: clean.slice(0, 20).map((d) => d.id),
       authors: [...new Set(clean.map((d) => d.authorId).filter(Boolean))].slice(0, 10),
     },
