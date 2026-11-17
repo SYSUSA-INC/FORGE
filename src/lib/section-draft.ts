@@ -45,6 +45,7 @@ import { goldenOf, screenPatternIntel } from "@/lib/golden-holdout";
 import { getApprovedCompanyModel } from "@/lib/company-model-read";
 import { lessonsForContext } from "@/lib/lessons-read";
 import { log } from "@/lib/log";
+import { researchSourcesForDraft } from "@/lib/research-store";
 
 export const DRAFT_MODES: readonly SectionDraftMode[] = [
   "draft",
@@ -109,6 +110,8 @@ export async function prepareSectionDraft(input: {
    * the winning text is dropped (src/lib/golden-holdout.ts).
    */
   holdout?: { proposalId: string; goldenText: string };
+  /** BL-NAV-LIFECYCLE 5b — who the research-source read audit names. */
+  actorUserId?: string;
 }): Promise<PreparedSectionDraft> {
   const { organizationId } = input;
   const authorGuidance = (input.hint ?? "").trim().slice(0, 2000);
@@ -355,6 +358,20 @@ export async function prepareSectionDraft(input: {
     });
     sources = gathered.sources;
     sourcesStubbed = gathered.stubbed;
+    // BL-NAV-LIFECYCLE 5b — public sources the proposal's research step found,
+    // numbered after the company's own and cited by URL. Never for a golden-eval holdout.
+    if (!input.holdout) {
+      const web = await researchSourcesForDraft({
+        organizationId,
+        proposalId: row.proposal.id,
+        firstIndex: sources.length + 1,
+        actor: { userId: input.actorUserId ?? null },
+      }).catch((err) => {
+        log.warn("[prepareSectionDraft]", "research sources read failed", { error: err });
+        return [];
+      });
+      sources = [...sources, ...web];
+    }
     snapshot.sources = sources.map((s) => ({
       index: s.index,
       kind: s.kind,

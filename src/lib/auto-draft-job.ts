@@ -19,7 +19,7 @@ import { db } from "@/db";
 import { backgroundJobs, proposalSectionSnapshots, proposalSections, proposals, type BackgroundJob, type TipTapDoc } from "@/db/schema";
 import { recordAudit } from "@/lib/audit-log";
 import { EMPTY_WORD_THRESHOLD, withTruncationNote } from "@/lib/auto-draft-logic";
-import { JobPermanentError } from "@/lib/jobs-policy";
+import { JobPermanentError, JobWaitError } from "@/lib/jobs-policy";
 import { markScanDirty } from "@/lib/proposal-scan-dirty";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { runSectionDraft } from "@/lib/section-draft-run";
@@ -65,6 +65,12 @@ export async function handleSectionAutoDraft(job: BackgroundJob): Promise<void> 
     await recordOutcome({ skipped: "Already has text — skipped." });
     return;
   }
+
+  // BL-NAV-LIFECYCLE 5b — drafts wait for the proposal's research step to finish so
+  // they can cite what it found (the pump runs it first; this covers a cron pickup).
+  // The wait does not count as an attempt, and ends when research finishes, fails or is stuck.
+  const { researchPending } = await import("@/lib/auto-draft");
+  if (await researchPending(organizationId, proposalId)) throw new JobWaitError("Waiting for the research step to finish.");
 
   const limit = await enforceRateLimit({ key: `ai-draft:org:${organizationId}`, limit: ORG_DRAFTS_PER_DAY, windowSeconds: 86_400 });
   if (!limit.ok) throw new JobPermanentError(`Your organization reached its daily AI draft limit (${ORG_DRAFTS_PER_DAY}). Run auto-draft again tomorrow.`);

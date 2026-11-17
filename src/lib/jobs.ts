@@ -40,6 +40,8 @@ import { runInBackground } from "@/lib/background";
 import {
   JOB_MAX_ATTEMPTS,
   JobPermanentError,
+  JobWaitError,
+  JOB_WAIT_MS,
   jobIsStuck,
   nextJobAttempt,
   resolveStuckJob,
@@ -77,7 +79,7 @@ export type JobContext = {
 };
 
 export type JobRunResult =
-  | { ran: false; reason: "not_claimable" }
+  | { ran: false; reason: "not_claimable" | "waiting" }
   | { ran: true; ok: true }
   | { ran: true; ok: false; error: string; retryScheduled: boolean };
 
@@ -267,6 +269,21 @@ export async function executeJob(
       .where(and(eq(backgroundJobs.id, jobId), eq(backgroundJobs.organizationId, organizationId)));
     return { ran: true, ok: true };
   } catch (err) {
+    // Waiting on another job is not a failure: back to the queue, attempt not counted.
+    if (err instanceof JobWaitError) {
+      const at = new Date();
+      await db
+        .update(backgroundJobs)
+        .set({
+          status: "queued",
+          attempts: sql`greatest(${backgroundJobs.attempts} - 1, 0)`,
+          nextAttemptAt: new Date(at.getTime() + JOB_WAIT_MS),
+          startedAt: null,
+          updatedAt: at,
+        })
+        .where(and(eq(backgroundJobs.id, jobId), eq(backgroundJobs.organizationId, organizationId)));
+      return { ran: false, reason: "waiting" };
+    }
     const permanent = err instanceof JobPermanentError;
     const message = (err instanceof Error ? err.message : String(err)).slice(0, 2000);
     const failedAt = new Date();
@@ -420,6 +437,8 @@ const HANDLERS: Record<BackgroundJobKind, Handler> = {
   solicitation_document_parse: handleSolicitationDocumentParse,
   proposal_harvest: handleProposalHarvest,
   section_auto_draft: handleSectionAutoDraft,
+  // BL-NAV-LIFECYCLE 5b — loaded when run: the research step imports the AI gateway.
+  proposal_research: async (job) => (await import("@/lib/research-job")).handleProposalResearch(job),
   knowledge_artifact_extract: handleKnowledgeArtifactExtract,
   // BL-SCOUT-INBOX — loaded when run: inbound-bids queues its own jobs through this module.
   inbound_email_parse: async (job) => (await import("@/lib/inbound-bids")).handleInboundEmailParse(job),

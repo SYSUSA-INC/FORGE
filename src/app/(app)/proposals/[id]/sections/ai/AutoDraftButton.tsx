@@ -10,7 +10,11 @@ import {
   type AutoDraftSection,
 } from "./auto-draft-actions";
 
-type Progress = AutoDraftProgress & { titles: Record<string, string> };
+type Progress = AutoDraftProgress & {
+  titles: Record<string, string>;
+  /** BL-NAV-LIFECYCLE 5b — the web research step that runs before the drafts. */
+  research?: { status: "queued" | "running" | "done" | "failed"; note: string; searches: number; sources: number } | null;
+};
 
 const POLL_MS = 5_000;
 
@@ -130,6 +134,16 @@ export function AutoDraftButton({ proposalId }: { proposalId: string }) {
                 </span>
               ) : null}
             </div>
+
+            {progress?.research ? (
+              <p className="mt-3 font-mono text-[11px] text-muted">
+                {progress.research.status === "queued" || progress.research.status === "running"
+                  ? "Researching the customer on the web before drafting…"
+                  : progress.research.sources > 0
+                    ? `Research: ${progress.research.searches} search${progress.research.searches === 1 ? "" : "es"}, ${progress.research.sources} cited source${progress.research.sources === 1 ? "" : "s"}. Web claims cite their address.`
+                    : `Research: ${progress.research.note || "nothing found"}`}
+              </p>
+            ) : null}
 
             {progress && progress.sections.length > 0 ? (
               <ul className="mt-4 divide-y divide-layer/5">

@@ -16,6 +16,18 @@
  */
 export class JobPermanentError extends Error {}
 
+/**
+ * Thrown by a handler that must wait for another job (a section draft
+ * waiting for its proposal's research step). The row goes back to
+ * `queued` for a short delay and the attempt is NOT counted: waiting is
+ * not a failure. The handler must stop throwing it once the other job
+ * finishes, fails or is stuck, so the wait is bounded by that job's own
+ * retry and stuck policy.
+ */
+export class JobWaitError extends Error {}
+/** How long a waiting job sleeps before it looks again. */
+export const JOB_WAIT_MS = 20_000;
+
 export const JOB_MAX_ATTEMPTS = 3;
 /** A run longer than this has died with its instance (Vercel caps at 5 min). */
 export const JOB_STUCK_AFTER_MS = 15 * 60_000;

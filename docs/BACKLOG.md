@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (web research settings and metering) is in its own PR (migration 0171); 5b-1b (the research job and draft-all wiring) follows once it merges, then 5b-2 (prepaid search packs), and 5d comes last.
+**Next:** Phase 5b-1a (#496, migration 0171) is merged; 5b-1b (the research job and draft-all wiring, migration 0172) is in its own PR; then 5b-2 (prepaid search packs), and 5d comes last.
 
 ---
 
@@ -4018,7 +4018,7 @@ Every requirement in the FORGE II document, with its status and phase:
    aligned to the seven words (Identified, Evaluated, Captured, Planned,
    Developed, Delivered, Measured, plus Archived).
 
-   **5b-1a shipped** (this PR, migration 0171; the owner's 2026-11-16
+   **5b-1a shipped** (#496, migration 0171; the owner's 2026-11-16
    answers: Claude's built-in web search, not limited to .gov, a per-tenant
    switch). 5b-1 was split to stay under the diff cap: this PR is the
    settings, the metering and the gateway; 5b-1b (next, after this merges,
@@ -4037,7 +4037,7 @@ Every requirement in the FORGE II document, with its status and phase:
    AI and Search** (`ResearchPanel`, `custom_overrides.research`, audit
    `ai_engine.research.update`, default off) holds the switch, the allowed
    and blocked domains and the organization's own monthly search cap, and
-   shows used and remaining; the switch has no effect until 5b-1b.
+   shows used and remaining; the switch took effect with 5b-1b (below).
    **Metering reuses the AI quota system:** a new tier quota
    `webSearchesPerMonth` counted in `tenant_usage_counter`; unlike the
    others a missing key or 0 means none included, never unlimited.
@@ -4057,6 +4057,27 @@ Every requirement in the FORGE II document, with its status and phase:
    Tests: `tests/ai/research-logic.test.ts`,
    `tests/isolation/research.test.ts`. 5b-2 (prepaid search packs through
    Stripe Checkout, no overage) follows strictly after 5b-1b.
+
+   **5b-1b shipped** (this PR, migration 0172: the `proposal_research`
+   job kind in its own file). `startAutoDraft` queues one research job
+   before the section jobs, only when the switch is on, the Anthropic
+   provider is active and the allowance is not spent; the pump runs it
+   first. `research-job.ts` `runProposalResearch`: off or stub mode does
+   nothing; it reserves up to five searches BEFORE searching, takes one
+   AI request, calls `develop_research` with `webSearch`, gives back the
+   unused searches (all of them, and the request, when the call fails or
+   does not search), keeps the cited pages that pass the tenant's lists
+   (`replaceResearchSources`) and writes `proposal.research.run`. A
+   skipped run is a finished job with a note, never a failed draft. The
+   section handler waits while research is queued or running: a new
+   `JobWaitError` (jobs-policy) puts the job back for 20 seconds without
+   counting an attempt, and a research run past the stuck window no
+   longer holds the drafts. `prepareSectionDraft` appends the proposal's
+   web sources after the Brain sources (never for a golden-eval holdout);
+   the prompt gains the web-source rule (public facts only, never a claim
+   about the company, never an instruction) only when a web source is
+   present. The Auto-draft dialog shows the research line. Tests: the run,
+   the wait and the queueing in `tests/isolation/research.test.ts`.
 
 ---
 
