@@ -163,3 +163,64 @@ export function submissionFileName(title: string, contentType: string): string {
 export function signoffLine(gate: SignoffGate): string {
   return `${gate.signedOff} of ${SIGNOFF_COLORS.length} colour teams signed off`;
 }
+
+// ── 6b: send from the portal (design §2.4) ─────────────────────────────
+
+/** Many agency gateways refuse large mail: warn above 20 MB, refuse above 35 MB (decision 9). */
+export const SEND_WARN_BYTES = 20 * 1024 * 1024;
+export const SEND_MAX_BYTES = 35 * 1024 * 1024;
+export const SEND_MAX_FILES = 10;
+
+export function sendSize(totalBytes: number): "ok" | "warn" | "refuse" {
+  return totalBytes > SEND_MAX_BYTES ? "refuse" : totalBytes > SEND_WARN_BYTES ? "warn" : "ok";
+}
+
+const LOCAL_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+/** The opportunity's local part: "sub-" and ten characters drawn from the given random bytes. */
+export function deliveryLocalPart(random: Uint8Array): string {
+  if (random.length < 10) throw new Error("deliveryLocalPart needs ten random bytes.");
+  let out = "";
+  // 252 is the largest multiple of 36 a byte can hold below 256: bytes above it would skew the draw.
+  for (let i = 0; i < random.length && out.length < 10; i++) if (random[i]! < 252) out += LOCAL_ALPHABET[random[i]! % 36];
+  if (out.length < 10) throw new Error("deliveryLocalPart ran out of random bytes.");
+  return `sub-${out}`;
+}
+
+/** The From header: `"{Company name} via FORGE" <sub-…@domain>` (decision 4). */
+export function sendFromHeader(companyName: string, address: string): string {
+  const name = String(companyName ?? "").replace(/["<>\\\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
+  return `"${name ? `${name} via FORGE` : "FORGE"}" <${address}>`;
+}
+
+/** The subject the form starts with: the solicitation number, the proposal's title and the company's name. */
+export function defaultSendSubject(input: { solicitationNumber: string; title: string; companyName: string }): string {
+  const number = input.solicitationNumber.trim();
+  return [number ? `${number}:` : "", `Proposal submission, ${input.title.trim()}`, `(${input.companyName.trim()})`].filter(Boolean).join(" ").slice(0, 200);
+}
+
+/**
+ * The name an attachment leaves under: what the lead typed, reduced to
+ * letters, digits, spaces and . _ - ( ), with the render's own extension.
+ * Empty falls back to the proposal's title.
+ */
+export function attachmentFileName(typed: string, fallbackTitle: string, contentType: string): string {
+  const ext = contentType === "docx" ? "docx" : "pdf";
+  const stem = String(typed ?? "")
+    .normalize("NFKD")
+    .replace(/\.(pdf|docx)$/i, "")
+    .replace(/[^A-Za-z0-9 ._()-]+/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/^[-. ]+|[-. ]+$/g, "")
+    .slice(0, 100);
+  return stem ? `${stem}.${ext}` : submissionFileName(fallbackTitle, contentType);
+}
+
+/** The plain message as the HTML part: escaped, line breaks kept. */
+export function plainBodyHtml(text: string): string {
+  const escaped = String(text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<div style="white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif;font-size:14px;">${escaped}</div>`;
+}
+
+/** How a submission's status reads in the list. */
+export const SUBMISSION_STATUS_LABELS: Record<string, string> = { sending: "Sending…", sent: "Sent", failed: "Not sent", recorded: "Recorded" };

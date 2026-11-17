@@ -298,3 +298,12 @@ ticked it on the newest White Gloves round. Record submission requires
 one kept render (PDF or Word) as the file; the optional receipt upload
 of §2.3 moves to 6b, which builds the upload of extra files, as does
 downloading the kept copy (the file's name, size and SHA-256 are shown).
+
+**As built in 6b-1.** The form and the job are in; attaching other
+uploaded files, the receipt upload and the kept copy's download move to
+6b-2 for the diff cap. `message_id` stores the provider's id of the
+message (Resend returns no RFC Message-ID); 6c routes replies by the
+`sub-` address first. A refusal by the provider is final for that row;
+a network error is retried under the row's idempotency key. A new audit
+action `proposal.submission.send_failed` records a send that did not
+leave.

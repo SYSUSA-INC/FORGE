@@ -31,7 +31,7 @@ export type ApplyOpportunityStageInput = {
   organizationId: string;
   opportunityId: string;
   stage: OpportunityStage;
-  actor: { userId: string; email?: string | null };
+  actor: { userId: string | null; email?: string | null };
   /** Free text for the activity row; gate decisions carry the reasoning. */
   reasoning?: string;
   /** Recorded on the activity and audit rows. */
@@ -129,7 +129,7 @@ export async function applyOpportunityStage(
       },
       subject: `Opportunity ${isGate ? "closed as" : "advanced to"} ${STAGE_LABELS[stage]}`,
       linkPath: `/opportunities/${opportunityId}`,
-      actorUserId: input.actor.userId,
+      actorUserId: input.actor.userId ?? undefined,
     });
   } catch (err) {
     log.warn("[opportunity-stage]", "rules dispatch failed", { error: err });
