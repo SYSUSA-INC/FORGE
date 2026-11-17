@@ -15,6 +15,7 @@ import { CreateSection } from "./CreateSection";
 import { EvaluateSection } from "./EvaluateSection";
 import { CaptureSection } from "./CaptureSection";
 import { PlanSection } from "./PlanSection";
+import { DeliverSection } from "./DeliverSection";
 import { DevelopSection } from "./DevelopSection";
 import { StageList, type StageListRow } from "./StageList";
 
@@ -145,6 +146,8 @@ export async function PipelineStagePage({ stageKey, searchParams }: { stageKey: 
         <PlanSection rows={rows} />
       ) : stage.key === "develop" ? (
         <DevelopSection rows={rows} />
+      ) : stage.key === "deliver" ? (
+        <DeliverSection rows={rows} />
       ) : (
         <StageList rows={rows} title={`In ${stage.label}`} empty={`Nothing is in ${stage.label} right now.`} />
       )}

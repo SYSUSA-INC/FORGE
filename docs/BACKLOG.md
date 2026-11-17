@@ -3101,7 +3101,7 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is merged as #507; 6c-2 (the AI reading of a reply, File as a document; no migration) is merged as #508. 6d is split in two: 6d-1 (Reply from the portal; migration 0180) is in its own PR; 6d-2 (Pipeline → Deliver's two lists) is next.
+**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is merged as #507; 6c-2 (the AI reading of a reply, File as a document; no migration) is merged as #508. 6d is split in two: 6d-1 (Reply from the portal; migration 0180) is merged as #509; 6d-2 (Pipeline → Deliver's two lists; no migration) is in its own PR and completes phase 6.
 
 ---
 
@@ -4294,7 +4294,7 @@ Every requirement in the FORGE II document, with its status and phase:
    Known limits: a reply filed before this PR keeps its header-only
    type (no re-read button); the model is asked once, with no retry.
 
-   **6d-1 shipped** (this PR, migration 0180; design §2.5 Answering).
+   **6d-1 shipped** (#509, migration 0180; design §2.5 Answering).
    **Reply** on a message in the Correspondence list opens a form in
    place: To is the message's stored sender (never typed), Cc
    optional, the sender copied by default, the subject the message's
@@ -4327,7 +4327,30 @@ Every requirement in the FORGE II document, with its status and phase:
    documentation could not be reached from the build session, so
    custom headers are confirmed from the installed SDK's types only
    and not yet by a real send.
-   **6d-2 next:** Pipeline → Deliver's two lists.
+
+   **6d-2 shipped** (this PR, no migration; design §2.6).
+   `/pipeline/deliver` shows two lists (`DeliverSection.tsx`, loaders
+   in `src/lib/deliver-pipeline.ts`, rules `readySignoffLine` and
+   `deliveredSummary` in `deliver-logic.ts`). **Ready to deliver:**
+   opportunities still in Develop (`pre_proposal`, `writing`) whose
+   newest proposal is at Gold or White Gloves, with the due date, the
+   colour teams' sign-off line ("3 of 5 colour teams signed off; Green
+   not run; White Gloves open") and **Open Deliver**. **Delivered:**
+   opportunities at `submitted`, each with the newest submission (how,
+   when, to whom; an answer to a reply is not taken for it), the
+   newest reply's type and date, and the replies that came since the
+   team's last message. Every query is batched over the list (two for
+   sign-off, two for the delivered lines) and scoped by organization.
+   Tests: `tests/isolation/deliver-pipeline.test.ts`,
+   `tests/ai/deliver-logic.test.ts`. Known limits: FORGE does not
+   track who has opened a reply, so the count is "since your last
+   message" (a submission or an answer sent from FORGE), not "unread"
+   per person: it does not clear when a reply is merely read or is
+   answered from someone's own mail (owner decision open: real
+   per-person read tracking needs a table and its own PR); the
+   list's sign-off line counts the colour teams only, the
+   submission-pack tick and the export gate are checked on the
+   Deliver tab. Phase 6 is complete with this PR.
 
 ---
 
