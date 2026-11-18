@@ -23,10 +23,13 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
   let fx: TwoTenantFixture;
   let pm: string;
   let outsider: string;
-  const today = isoDay(new Date());
+  // Read at the start of each test, not when the file loads: the store
+  // dates the kick-off from the clock, so the two must be the same day.
+  let today: string;
   const tag = () => `ms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
   beforeEach(async () => {
+    today = isoDay(new Date());
     fx = await createTwoTenants("milestones");
     pm = `pm-${tag()}`;
     outsider = `out-${tag()}`;
@@ -111,7 +114,10 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
     await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Nobody's", kind: "other", date: addDays(today, 3), ownerUserId: null, notes: "", actor: actorA() });
     await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Not yet", kind: "other", date: addDays(today, 5), ownerUserId: pm, notes: "", actor: actorA() });
 
-    const first = await dispatchMilestoneDueSoon();
+    // Every run gets a date built from `today`, never the clock, so a run
+    // that straddles midnight UTC still counts the same days.
+    const noonToday = new Date(`${today}T12:00:00Z`);
+    const first = await dispatchMilestoneDueSoon(noonToday);
     expect(first.errors).toBe(0);
     const rules = await db.select({ name: notificationRules.name, channels: notificationRules.channels }).from(notificationRules).where(and(eq(notificationRules.organizationId, org()), eq(notificationRules.triggerEventKind, "milestone_due_soon")));
     expect(rules).toEqual([{ name: "Default: Milestone due soon", channels: ["in_app", "email"] }]);
@@ -121,14 +127,13 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
     expect(deliveries.length).toBeGreaterThan(0);
 
     // A retry the same day is deduplicated; a milestone marked done is left alone.
-    const second = await dispatchMilestoneDueSoon();
+    const second = await dispatchMilestoneDueSoon(noonToday);
     expect(second.duplicatesSkipped).toBeGreaterThanOrEqual(1);
     expect(await db.select().from(notifications).where(eq(notifications.organizationId, org()))).toHaveLength(1);
     await updateMilestone({ organizationId: org(), opportunityId: opp(), milestoneId: (owned as { ok: true; id: string }).id, patch: { status: "done" }, actor: actorA() });
-    // Tomorrow, built from `today` rather than from the clock plus some
-    // hours: late in the UTC day that lands two days ahead, where "Not
-    // yet" (today + 5) is at T-3. From tomorrow it is at T-4, and no
-    // other owned, planned milestone is at T-7, T-3 or T-1.
+    // Tomorrow: "Not yet" (today + 5) is at T-4, and no other owned,
+    // planned milestone is at T-7, T-3 or T-1. (Two days ahead it would
+    // be at T-3, which is what clock + 25 hours gave late in the UTC day.)
     const third = await dispatchMilestoneDueSoon(new Date(`${addDays(today, 1)}T12:00:00Z`));
     expect(third.remindersDispatched).toBe(0);
     expect(await db.select().from(notifications).where(eq(notifications.organizationId, fx.orgB.organizationId))).toEqual([]);
