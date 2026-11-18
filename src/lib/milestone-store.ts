@@ -96,10 +96,10 @@ async function milestoneRows(organizationId: string, opportunityId: string): Pro
 }
 
 /** The schedule as the Plan tab shows it; null when the opportunity is not the tenant's. */
-export async function loadSchedule(input: { organizationId: string; opportunityId: string }): Promise<ScheduleView | null> {
+export async function loadSchedule(input: { organizationId: string; opportunityId: string; now?: Date }): Promise<ScheduleView | null> {
   const ctx = await scheduleContext(input.organizationId, input.opportunityId);
   if (!ctx) return null;
-  const todayIso = isoDay(new Date());
+  const todayIso = isoDay(input.now ?? new Date());
   const milestones = await milestoneRows(input.organizationId, input.opportunityId);
   return { todayIso, anchor: scheduleAnchor({ responseDueIso: ctx.responseDueIso, keyDates: ctx.keyDates }), keyDates: ctx.keyDates, milestones, state: scheduleState(milestones, todayIso) };
 }
@@ -131,16 +131,17 @@ async function touchPlan(organizationId: string, planId: string) {
  * Build the schedule: the count-back proposed from the due date and
  * written, kinds already on the plan left alone. A colour-team milestone
  * gets no owner (its reviewers are the plan's colour team); the others
- * are left for the manager to assign.
+ * are left for the manager to assign. `now` is the day to count from;
+ * callers leave it out, tests pin it so a run cannot cross midnight.
  */
-export async function buildSchedule(input: { organizationId: string; opportunityId: string; actor: Actor }): Promise<Result> {
+export async function buildSchedule(input: { organizationId: string; opportunityId: string; actor: Actor; now?: Date }): Promise<Result> {
   const { organizationId, opportunityId } = input;
   const plan = await loadPlan({ organizationId, opportunityId, actor: input.actor });
   if (!plan) return { ok: false, error: "Opportunity not found." };
   const ctx = await scheduleContext(organizationId, opportunityId);
   if (!ctx) return { ok: false, error: "Opportunity not found." };
   const existing = await milestoneRows(organizationId, opportunityId);
-  const todayIso = isoDay(new Date());
+  const todayIso = isoDay(input.now ?? new Date());
   const proposed = proposeSchedule({ todayIso, responseDueIso: ctx.responseDueIso, keyDates: ctx.keyDates, existingKinds: existing.map((m) => m.kind) });
   if (proposed.length === 0) {
     return { ok: false, error: ctx.responseDueIso || ctx.keyDates.some((k) => k.type === "proposal_due") ? "The schedule already has every proposed milestone." : "Set the response due date first: the schedule counts back from it." };

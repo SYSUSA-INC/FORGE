@@ -23,9 +23,11 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
   let fx: TwoTenantFixture;
   let pm: string;
   let outsider: string;
-  // Read at the start of each test, not when the file loads: the store
-  // dates the kick-off from the clock, so the two must be the same day.
+  // Read once at the start of each test. Every call that counts days
+  // (the store, the reminder run) is then given `noon()`, never the
+  // clock, so a test that crosses midnight UTC still sees one day.
   let today: string;
+  const noon = () => new Date(`${today}T12:00:00Z`);
   const tag = () => `ms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
   beforeEach(async () => {
@@ -56,13 +58,13 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
   const opp = () => fx.orgA.opportunityId;
 
   it("builds the schedule from the due date, once, and counts it in the plan's state", async () => {
-    const before = await loadSchedule({ organizationId: org(), opportunityId: opp() });
+    const before = await loadSchedule({ organizationId: org(), opportunityId: opp(), now: noon() });
     expect(before!.anchor).toEqual({ iso: addDays(today, 40), key: "response_due" });
     expect(before!.milestones).toEqual([]);
 
-    const res = await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() });
+    const res = await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() });
     expect(res).toEqual({ ok: true, added: 6 });
-    const after = await loadSchedule({ organizationId: org(), opportunityId: opp() });
+    const after = await loadSchedule({ organizationId: org(), opportunityId: opp(), now: noon() });
     expect(after!.milestones.map((m) => [m.kind, m.date, m.ownerUserId, m.status])).toEqual([
       ["kick_off", today, null, "planned"],
       ["pink_team", addDays(today, 10), null, "planned"],
@@ -74,7 +76,7 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
     expect(after!.state).toEqual({ total: 6, planned: 6, done: 0, missed: 0, overdue: 0, nextDate: today });
 
     // Building again adds nothing and says so.
-    expect(await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() })).toEqual({ ok: false, error: "The schedule already has every proposed milestone." });
+    expect(await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() })).toEqual({ ok: false, error: "The schedule already has every proposed milestone." });
     expect(await db.select().from(opportunityMilestones).where(eq(opportunityMilestones.opportunityId, opp()))).toHaveLength(6);
 
     const plan = await loadPlan({ organizationId: org(), opportunityId: opp(), actor: actorA() });
@@ -86,17 +88,17 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
 
   it("refuses to build without a due date, but still takes a milestone by hand", async () => {
     await db.update(opportunities).set({ responseDueDate: null }).where(eq(opportunities.id, opp()));
-    expect(await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() })).toEqual({ ok: true, added: 1 });
-    expect((await loadSchedule({ organizationId: org(), opportunityId: opp() }))!.milestones.map((m) => m.kind)).toEqual(["kick_off"]);
-    expect((await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() })).ok).toBe(false);
+    expect(await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() })).toEqual({ ok: true, added: 1 });
+    expect((await loadSchedule({ organizationId: org(), opportunityId: opp(), now: noon() }))!.milestones.map((m) => m.kind)).toEqual(["kick_off"]);
+    expect((await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() })).ok).toBe(false);
     const add = await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Pricing review", kind: "pricing_complete", date: addDays(today, 5), ownerUserId: pm, notes: "", actor: actorA() });
     expect(add.ok).toBe(true);
     expect((await addMilestone({ organizationId: org(), opportunityId: opp(), title: "x", kind: "other", date: today, ownerUserId: outsider, notes: "", actor: actorA() })).ok).toBe(false);
   });
 
   it("moves, re-owns, marks and removes a milestone, each audited", async () => {
-    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() });
-    const red = (await loadSchedule({ organizationId: org(), opportunityId: opp() }))!.milestones.find((m) => m.kind === "red_team")!;
+    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() });
+    const red = (await loadSchedule({ organizationId: org(), opportunityId: opp(), now: noon() }))!.milestones.find((m) => m.kind === "red_team")!;
     expect((await updateMilestone({ organizationId: org(), opportunityId: opp(), milestoneId: red.id, patch: { date: addDays(today, 22), ownerUserId: pm }, actor: actorA() })).ok).toBe(true);
     expect((await updateMilestone({ organizationId: org(), opportunityId: opp(), milestoneId: red.id, patch: { status: "done" }, actor: actorA() })).ok).toBe(true);
     const [row] = await db.select({ date: opportunityMilestones.date, ownerUserId: opportunityMilestones.ownerUserId, status: opportunityMilestones.status }).from(opportunityMilestones).where(eq(opportunityMilestones.id, red.id));
@@ -109,15 +111,12 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
 
   it("reminds the owner at T-7, T-3 and T-1 through the seeded default rule, once per day, and skips unowned rounds", async () => {
     await db.insert(solicitations).values({ organizationId: org(), opportunityId: opp(), title: "RFP" });
-    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() });
+    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() });
     const owned = await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Pricing complete", kind: "pricing_complete", date: addDays(today, 3), ownerUserId: pm, notes: "", actor: actorA() });
     await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Nobody's", kind: "other", date: addDays(today, 3), ownerUserId: null, notes: "", actor: actorA() });
     await addMilestone({ organizationId: org(), opportunityId: opp(), title: "Not yet", kind: "other", date: addDays(today, 5), ownerUserId: pm, notes: "", actor: actorA() });
 
-    // Every run gets a date built from `today`, never the clock, so a run
-    // that straddles midnight UTC still counts the same days.
-    const noonToday = new Date(`${today}T12:00:00Z`);
-    const first = await dispatchMilestoneDueSoon(noonToday);
+    const first = await dispatchMilestoneDueSoon(noon());
     expect(first.errors).toBe(0);
     const rules = await db.select({ name: notificationRules.name, channels: notificationRules.channels }).from(notificationRules).where(and(eq(notificationRules.organizationId, org()), eq(notificationRules.triggerEventKind, "milestone_due_soon")));
     expect(rules).toEqual([{ name: "Default: Milestone due soon", channels: ["in_app", "email"] }]);
@@ -127,7 +126,7 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
     expect(deliveries.length).toBeGreaterThan(0);
 
     // A retry the same day is deduplicated; a milestone marked done is left alone.
-    const second = await dispatchMilestoneDueSoon(noonToday);
+    const second = await dispatchMilestoneDueSoon(noon());
     expect(second.duplicatesSkipped).toBeGreaterThanOrEqual(1);
     expect(await db.select().from(notifications).where(eq(notifications.organizationId, org()))).toHaveLength(1);
     await updateMilestone({ organizationId: org(), opportunityId: opp(), milestoneId: (owned as { ok: true; id: string }).id, patch: { status: "done" }, actor: actorA() });
@@ -140,12 +139,12 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
   });
 
   it("keeps everything inside the tenant", async () => {
-    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA() });
+    await buildSchedule({ organizationId: org(), opportunityId: opp(), actor: actorA(), now: noon() });
     const [ms] = await db.select({ id: opportunityMilestones.id }).from(opportunityMilestones).where(eq(opportunityMilestones.opportunityId, opp())).limit(1);
     const b = fx.orgB;
     const actorB = { userId: b.userId, email: "b@bl19-isolation.test", name: "Bo" };
-    expect(await loadSchedule({ organizationId: b.organizationId, opportunityId: opp() })).toBeNull();
-    expect((await buildSchedule({ organizationId: b.organizationId, opportunityId: opp(), actor: actorB })).ok).toBe(false);
+    expect(await loadSchedule({ organizationId: b.organizationId, opportunityId: opp(), now: noon() })).toBeNull();
+    expect((await buildSchedule({ organizationId: b.organizationId, opportunityId: opp(), actor: actorB, now: noon() })).ok).toBe(false);
     expect((await addMilestone({ organizationId: b.organizationId, opportunityId: opp(), title: "x", kind: "other", date: today, ownerUserId: null, notes: "", actor: actorB })).ok).toBe(false);
     expect((await updateMilestone({ organizationId: b.organizationId, opportunityId: opp(), milestoneId: ms.id, patch: { status: "done" }, actor: actorB })).ok).toBe(false);
     expect((await removeMilestone({ organizationId: b.organizationId, opportunityId: opp(), milestoneId: ms.id, actor: actorB })).ok).toBe(false);
