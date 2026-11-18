@@ -125,7 +125,11 @@ describe("BL-NAV-LIFECYCLE 4b-1 — milestones and the schedule", () => {
     expect(second.duplicatesSkipped).toBeGreaterThanOrEqual(1);
     expect(await db.select().from(notifications).where(eq(notifications.organizationId, org()))).toHaveLength(1);
     await updateMilestone({ organizationId: org(), opportunityId: opp(), milestoneId: (owned as { ok: true; id: string }).id, patch: { status: "done" }, actor: actorA() });
-    const third = await dispatchMilestoneDueSoon(new Date(Date.now() + 25 * 60 * 60 * 1000));
+    // Tomorrow, built from `today` rather than from the clock plus some
+    // hours: late in the UTC day that lands two days ahead, where "Not
+    // yet" (today + 5) is at T-3. From tomorrow it is at T-4, and no
+    // other owned, planned milestone is at T-7, T-3 or T-1.
+    const third = await dispatchMilestoneDueSoon(new Date(`${addDays(today, 1)}T12:00:00Z`));
     expect(third.remindersDispatched).toBe(0);
     expect(await db.select().from(notifications).where(eq(notifications.organizationId, fx.orgB.organizationId))).toEqual([]);
   });
