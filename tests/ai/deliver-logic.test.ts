@@ -23,6 +23,8 @@ import {
   SIGNOFF_COLORS,
   signoffGate,
   signoffLine,
+  deliveredSummary,
+  readySignoffLine,
   snapshotOf,
   submissionFileName,
   type SignoffRound,
@@ -195,5 +197,43 @@ describe("6b — the rules of Send from FORGE", () => {
 
   it("escapes the plain message for the HTML part", () => {
     expect(plainBodyHtml("a <b> & c\nline two")).toContain("a &lt;b&gt; &amp; c\nline two");
+  });
+});
+
+describe("Pipeline → Deliver (6d-2)", () => {
+  it("says how many colours signed off and what the rest are", () => {
+    expect(readySignoffLine(allPassed())).toBe("5 of 5 colour teams signed off");
+    const rounds = allPassed()
+      .filter((r) => r.color !== "green")
+      .map((r) => (r.color === "white_gloves" ? { ...r, status: "in_progress" as const, verdict: null } : r));
+    expect(readySignoffLine(rounds)).toBe("3 of 5 colour teams signed off; Green not run; White Gloves open");
+    expect(readySignoffLine([])).toMatch(/^0 of 5 colour teams signed off; Pink not run;/);
+  });
+
+  const at = (d: string) => new Date(`2026-11-${d}T12:00:00Z`);
+  it("reads the newest submission, the newest reply and the replies since the last message", () => {
+    const sent = [
+      { method: "own_email" as const, status: "recorded", sentAt: at("10"), recipients: ["old@agency.gov"], isAnswer: false },
+      { method: "portal_email" as const, status: "sent", sentAt: at("12"), recipients: ["co@agency.gov"], isAnswer: false },
+      { method: "portal_email" as const, status: "failed", sentAt: null, recipients: ["x@agency.gov"], isAnswer: false },
+      { method: "portal_email" as const, status: "sent", sentAt: at("14"), recipients: ["co@agency.gov"], isAnswer: true },
+    ];
+    const replies = [
+      { type: "receipt", receivedAt: at("13"), read: true },
+      { type: "question", receivedAt: at("15"), read: true },
+      { type: "", receivedAt: at("16"), read: false },
+    ];
+    const s = deliveredSummary(sent, replies);
+    // An answer is not the submission, but it is the team's last message.
+    expect(s.submission).toEqual({ method: "portal_email", sentAt: at("12").toISOString(), recipients: ["co@agency.gov"] });
+    expect(s.newestReply).toEqual({ type: "", receivedAt: at("16").toISOString() });
+    expect(s.replies).toBe(3);
+    expect(s.repliesSinceLastSent).toBe(2);
+    expect(deliveredSummary(sent.slice(0, 2), replies).repliesSinceLastSent).toBe(3);
+  });
+
+  it("copes with nothing on record", () => {
+    expect(deliveredSummary([], [])).toEqual({ submission: null, newestReply: null, replies: 0, repliesSinceLastSent: 0 });
+    expect(deliveredSummary([], [{ type: "other", receivedAt: at("13"), read: true }])).toMatchObject({ submission: null, newestReply: { type: "other" }, repliesSinceLastSent: 1 });
   });
 });

@@ -343,3 +343,10 @@ told apart by `proposal_submission.in_reply_to_email_id` (migration
 carries the one Message-ID FORGE holds (the message answered), not
 the whole chain. The answer does not quote the message. A delivery
 failure cannot be answered. Pipeline → Deliver moves to 6d-2.
+
+**As built in 6d-2.** The Ready list's sign-off line counts the colour
+teams and names the ones not signed off; the submission-pack tick and
+the export gate stay on the Deliver tab. FORGE has no per-reply read
+tracking, so "unread replies" is built as the replies received since
+the team's last message (a submission or an answer); per-person read
+tracking is an open owner decision.

@@ -253,3 +253,53 @@ export function plainBodyHtml(text: string): string {
 
 /** How a submission's status reads in the list. */
 export const SUBMISSION_STATUS_LABELS: Record<string, string> = { sending: "Sending…", sent: "Sent", failed: "Not sent", recorded: "Recorded" };
+
+// ── 6d-2: Pipeline → Deliver (design §2.6) ─────────────────────────────
+
+/** A proposal at one of these stages, on an opportunity still in Develop, is ready to deliver. */
+export const READY_PROPOSAL_STAGES = ["gold_team", "white_gloves"] as const;
+
+/**
+ * The sign-off line of the Ready to deliver list, from the colour teams
+ * alone: "4 of 5 colour teams signed off; White Gloves open". The
+ * submission-pack tick and the export gate are checked on the Deliver
+ * tab, not here.
+ */
+export function readySignoffLine(rounds: SignoffRound[]): string {
+  const colors = SIGNOFF_COLORS.map((c) => colourSignoff(c, rounds));
+  const rest = colors.filter((c) => c.state !== "signed_off").map((c) => `${SIGNOFF_COLOR_LABELS[c.color]} ${c.state === "open" ? "open" : "not run"}`);
+  return [`${colors.length - rest.length} of ${colors.length} colour teams signed off`, ...rest].join("; ");
+}
+
+/** A row of `proposal_submission`, as the Delivered list reads it. `isAnswer`: an answer to a reply (6d-1), not a submission. */
+export type DeliveredSent = { method: keyof typeof SUBMISSION_METHOD_LABELS; status: string; sentAt: Date | null; recipients: string[]; isAnswer: boolean };
+export type DeliveredReply = { type: string; receivedAt: Date; read: boolean };
+
+export type DeliveredSummary = {
+  /** The newest submission that left or was recorded; null when none is on record. */
+  submission: { method: keyof typeof SUBMISSION_METHOD_LABELS; sentAt: string; recipients: string[] } | null;
+  /** The newest reply; `type` is "" while it has not been read yet. */
+  newestReply: { type: string; receivedAt: string } | null;
+  replies: number;
+  /**
+   * Replies that came after the newest message the team sent (a
+   * submission or an answer). FORGE does not track who has opened a
+   * reply, so this is "not answered since", not "unread".
+   */
+  repliesSinceLastSent: number;
+};
+
+/** One opportunity's line on the Delivered list. */
+export function deliveredSummary(sent: DeliveredSent[], replies: DeliveredReply[]): DeliveredSummary {
+  const left = sent.filter((s): s is DeliveredSent & { sentAt: Date } => s.sentAt !== null && (s.status === "sent" || s.status === "recorded"));
+  const newest = <T,>(list: T[], at: (x: T) => Date): T | null => list.reduce<T | null>((best, x) => (best === null || time(at(x)) > time(at(best)) ? x : best), null);
+  const submission = newest(left.filter((s) => !s.isAnswer), (s) => s.sentAt);
+  const lastSent = newest(left, (s) => s.sentAt);
+  const reply = newest(replies, (r) => r.receivedAt);
+  return {
+    submission: submission ? { method: submission.method, sentAt: submission.sentAt.toISOString(), recipients: submission.recipients } : null,
+    newestReply: reply ? { type: reply.read ? reply.type : "", receivedAt: reply.receivedAt.toISOString() } : null,
+    replies: replies.length,
+    repliesSinceLastSent: lastSent ? replies.filter((r) => time(r.receivedAt) > time(lastSent.sentAt)).length : replies.length,
+  };
+}
