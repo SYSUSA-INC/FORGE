@@ -77,7 +77,7 @@ Effort key:
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | ✅ shipped (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393 and #394; 2f-2 (chat attachments) shipped in PR #395; 2f-3 (contacts import in parts, paste guards; the last phase) shipped in PR #396) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | ✅ shipped: 7a #370, 7b #371, 7c #372, 7d #373, 7e #388 |
-| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
+| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | ✅ shipped: 10a (PR #375); 10b (PR #376 to #383, and 10b-4 in PR #385); 10d (PR #385); 10e (PR #386). 10c (a reserve for the shared key) waits on what the quota logs show |
 | 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | ✅ shipped (#399) |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-8; owner decisions 2026-10-21 recorded) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
@@ -100,8 +100,8 @@ Effort key:
 | 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
 | 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
 | 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 ✅ #493 (BL-SCOUT-LEARN); D (BL-SCOUT-SHOWN) ✅ #494; then Phase 5c (the review meeting) 🔄 its own PR, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
-| 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address #450, closing 8b; then 8c, 8d |
+| 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (BL-STAB-2 has shipped; not started) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
 | 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
@@ -135,7 +135,7 @@ Effort key:
 Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. The code-side guards are in; what remains is the one-time operator setup the runbook walks through.
 
 ### BL-TENANT-AUDIT — Multi-tenant data firewall audit
-**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  🚧 2026-09 quarterly re-run + CI gates (PR #261)
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  ✅ 2026-09 quarterly re-run + CI gates (PR #261, `docs/audits/07-multi-tenant-firewall-2026-09.md`, PASS)  ·  next quarterly re-run due 2026-12
 
 **2026-09 re-run (PR #261):** the codebase grew from 14 to 20 API routes
 and 32 to 43 tenant-scoped tables since June, and Phases A–C moved most
@@ -200,7 +200,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · 🔄 BL-STAB-11 in review · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ✅ BL-STAB-10 shipped (10a in PR #375, 10b in PR #376 to #383 and #385, 10d in PR #385, 10e in PR #386; 10c, a reserve for the shared key, waits on the quota logs) · ✅ BL-STAB-11 shipped (PR #399) · 🔄 BL-STAB-8 (8a shipped in PR #415, #416 and #439 to #445; 8b shipped in PR #446 to #448 and #450; 8c verified mobile phone and 8d Cloudflare not started) · ⏳ BL-STAB-3 (after BL-STAB-8; owner, 2026-10-21), 4b and 5 not started
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -857,8 +857,8 @@ mind. Bandage will come off but a true fix will stay."
         refusal advised splitting text that could never fit (the limit is
         the document's: `goldTextRefusal` says how much still fits); the
         summary rows omitted 2f-3.
-- **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped
-  (PR #375); 10b in progress.
+- **BL-STAB-10 — Import from SAM.gov ignores the keyword.** ✅ shipped: 10a
+  (PR #375), 10b (PR #376 to #383, #385), 10d (PR #385), 10e (PR #386); 10c open.
   - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10
     award notices and a sources sought, none about ServiceNow.
   - **Root cause:** SAM.gov's public search has no keyword parameter (only
@@ -943,7 +943,7 @@ mind. Bandage will come off but a true fix will stay."
         tag-shaped markup only and numeric entities in `plainText` /
         `readableText`; the recompete radar sees the copy's text; the
         scout's keyword fit reads across line breaks.
-    - **10b-4 (PR #385):** log the key's remaining requests from the
+    - **10b-4 (shipped, PR #385):** log the key's remaining requests from the
       gateway's rate-limit headers (`x-ratelimit-limit`,
       `x-ratelimit-remaining`, `retry-after`; digits only), only on
       replies to FORGE's own key: `[samgov] quota` once per credential,
@@ -977,7 +977,7 @@ mind. Bandage will come off but a true fix will stay."
       take the 6-digit code or are named, never guessed; generic
       keywords are flagged; a decision made while a run clears its find
       is kept.
-  - **10e (PR #386) — the scout's AI triage judges scope, not codes.**
+  - **10e (shipped, PR #386) — the scout's AI triage judges scope, not codes.**
     Owner's report (2026-10-13): an EPA SBIR BAA under NAICS 541715 was
     triaged "Pursue · 75%" because the code was in the list and the
     set-aside fit; the triage saw only keywords, codes and set-asides,
@@ -1069,7 +1069,7 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388).
+  nowhere to set one.** ✅ shipped: 7a (PR #370); 7b (PR #371, follow-up PR #384); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388).
   - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
@@ -1149,8 +1149,8 @@ mind. Bandage will come off but a true fix will stay."
     and re-encryption counts it apart, with the advice to restore the
     value rather than remove keys.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
-  data.** 🔄 next (added 2026-10-08; owner, 2026-10-21: next, now
-  that BL-STAB-2 has shipped).
+  data.** 🔄 8a ✅ (#415, #416, #439 to #445), 8b ✅ (#446 to #448, #450); 8c, 8d not
+  started (added 2026-10-08; owner, 2026-10-21: next after BL-STAB-2).
   - **Ask (owner):** "We need to enforce some security gates for
     signup, MFA mandatory, Email validation, mobile phone validation,
     and Cloudflare implementation to ensure we are protecting the
@@ -1232,7 +1232,7 @@ mind. Bandage will come off but a true fix will stay."
       recovery codes, or for new devices in 8a.
     - **Factors:** up to 3 per user (authenticator apps and passkeys
       together) and 10 single-use recovery codes, regenerated on demand.
-  - **8a-0 foundations (in progress):** the fixes below ship as small
+  - **8a-0 foundations (shipped: #415, #416, #439, #440):** the fixes below ship as small
     PRs ahead of the MFA work. Done: `safeRedirectTarget` rejects
     backslashes (`/\evil.com`) and is now plain UTF-8 with a test
     (#415). Password sign-in is rate-limited per email (10 per 15
@@ -1252,9 +1252,9 @@ mind. Bandage will come off but a true fix will stay."
     with 409 before the token is spent and the account's next sign-in
     accepts the invite; a self-service sign-up for an unverified account
     changes nothing and re-sends the verification email, so nobody can
-    seed the password the inbox's owner then verifies into (this PR).
-    Still to do, with 8a: ending open sessions on disable or password
-    reset (needs a session version).
+    seed the password the inbox's owner then verifies into (#440).
+    Ending open sessions on disable or password reset shipped with
+    8a-2 (#443, the session version).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
@@ -1265,7 +1265,7 @@ mind. Bandage will come off but a true fix will stay."
     account's password and self sign-up can overwrite an unverified one;
     password sign-in has no rate limit and the limiter fails open;
     `safeRedirectTarget` lets `/\evil.com` through.
-  - **8a-2 delivered (this PR):** `src/lib/session-policy.ts` (pure,
+  - **8a-2 delivered (#443):** `src/lib/session-policy.ts` (pure,
     tested: the claims, `evaluateSession` with the 8-hour idle, 24-hour
     absolute and 10-minute pending limits and the end of pre-policy
     tokens, `touchSession`, `needsRecheck`, `mfaEnforcement` with the
@@ -1341,7 +1341,7 @@ mind. Bandage will come off but a true fix will stay."
       banner to everyone; `MFA_PREVIEW_BYPASS_CODE` is accepted as a code
       only when `VERCEL_ENV=preview`. Google / Microsoft sign-ins take
       the same second step.
-    - **8a-3 — passkeys** (this PR). Register and sign in with WebAuthn
+    - **8a-3 — passkeys** (#444). Register and sign in with WebAuthn
       (platform and roaming authenticators) as a second factor beside
       the authenticator app, within the three-factor cap:
       `@simplewebauthn/server` and `/browser` v9 (the versions
@@ -1356,7 +1356,7 @@ mind. Bandage will come off but a true fix will stay."
       enrol page with the app option hidden, and the server refuses to
       pass the step on an app alone. Verified end to end with a virtual
       authenticator (Playwright CDP).
-    - **8a-4 — the reset, the rollout and the manuals** (this PR).
+    - **8a-4 — the reset, the rollout and the manuals** (#445).
       SuperAdmin → Platform users → **Reset MFA…** with a written reason
       (10–500 characters): every factor and recovery code removed, the
       enrolment and any pending pass marker cleared, `session_version`
@@ -1377,7 +1377,7 @@ mind. Bandage will come off but a true fix will stay."
       15 minutes before; the editors already autosave); (4) SMS as a
       factor waits for the provider (as decided), so 8a ships with the
       authenticator app and passkeys.
-  - **8b design (proposed 2026-11-01; approved by merging this PR).**
+  - **8b design (proposed 2026-11-01; approved by merging #446).**
     What is true today, from the code. **Password sign-in** refuses an
     account whose address is unverified (`authorize`). **Self-service
     sign-up** emails a verification link (24 hours) and refuses
@@ -1402,7 +1402,7 @@ mind. Bandage will come off but a true fix will stay."
       not travel through the inbox proves nothing; the address is
       checked for deliverability before an email is ever sent to it;
       a changed address is a new address.
-    - **8b-1 — the gate** (this PR). Shipped as designed with one
+    - **8b-1 — the gate** (#447). Shipped as designed with one
       simplification: the "went by email" flag lives on the token row
       alone (`verificationToken.sent_by_email`, set by `markTokenSent`
       when the invite, reset or verification email actually went; read
@@ -1436,7 +1436,7 @@ mind. Bandage will come off but a true fix will stay."
       when it is true. The unverified-purge keeps its 7-day rule and
       its "alone in every workspace" guard, so an invitee who never
       verified is not deleted from under a workspace.
-    - **8b-2 — deliverability** (this PR). Shipped as designed, with one
+    - **8b-2 — deliverability** (#448). Shipped as designed, with one
       addition: a canary. A domain that comes back "no such domain / no
       records" is refused only when the resolver can also find
       `sysgov.com` (`EMAIL_DELIVERABILITY_CANARY` overrides); a resolver
@@ -1462,7 +1462,7 @@ mind. Bandage will come off but a true fix will stay."
       the invite still allowed (the admin may know better), recorded on
       the audit row. Unit-tested with a stubbed resolver; a tiny
       runtime test against a known domain is skipped offline.
-    - **8b-3 — change of address** (this PR). Shipped as designed:
+    - **8b-3 — change of address** (#450). Shipped as designed:
       `src/lib/email-change.ts` (pure rules, tested), `email-change-store`
       (the pending change on the user row, migration 0144; a 24-hour
       `change-email` token keyed by the new address; `confirmEmailChange`
@@ -1503,8 +1503,8 @@ mind. Bandage will come off but a true fix will stay."
       release backfills the stamp for accounts that hold a provider
       link, because the provider verified them; the rest are asked at
       their next sign-in.
-- **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
-  BL-STAB-2.
+- **BL-STAB-3 — New Solicitation accepts one file.** ⏳ not started; queued
+  after BL-STAB-8 (owner, 2026-10-21).
   - **Ask:** Upload several files at once; FORGE decides what each is
     and how to file it.
   - **Fix:**
@@ -1555,7 +1555,7 @@ mind. Bandage will come off but a true fix will stay."
       and each is filed with its type and parsed; its requirements are
       merged as before.
 - **BL-STAB-5 — Q&A in the format the contracting officer released
-  it.** ⏳ queued, after BL-STAB-2.
+  it.** ⏳ not started (BL-STAB-2, which it waited on, has shipped).
   - **Ask:** Accept Word, Excel, PDF or text. FORGE should make sense
     of it and give suggestions based on the Q&A.
   - **Fix:**
@@ -1567,7 +1567,7 @@ mind. Bandage will come off but a true fix will stay."
     - Suggestions say what the response should change because of each
       answer.
 - **BL-STAB-11 — Superadmin pages fail with "malformed array literal".**
-  🔄 in review.
+  ✅ shipped (PR #399).
   - **Found (2026-10-21):** loading every page in both themes for the
     colour review. `/admin/orgs/[id]/activity` failed for any tenant with
     activity; `/admin` and `/admin/orgs/[id]` failed whenever a
