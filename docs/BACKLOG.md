@@ -579,7 +579,7 @@ mind. Bandage will come off but a true fix will stay."
         being checked now cancels it on screens with no filing step; a
         stored, unfiled file removed from any upload list is deleted at
         once. 300 seconds per request.
-      - **Review of this PR (5 of 14 upheld):** removing a stored upload
+      - **Review of PR #390 (5 of 14 upheld):** removing a stored upload
         from a list (a cancel) could delete the file of a record whose
         save landed but reported an error — `cancelUpload` now never
         touches a file a record holds (the sweep finishes that filing);
@@ -744,7 +744,7 @@ mind. Bandage will come off but a true fix will stay."
         and the delete was cascaded without its file — every delete of a
         solicitation, document or knowledge file now also releases that
         kind's uploads whose records are gone (`releaseOrphanedClaims`,
-        which also clears files left by deletes made before this PR); a
+        which also clears files left by deletes made before PR #394); a
         template save that landed but reported an error is now kept, and
         any file an earlier attempt left on a template is released at its
         next replace or clear (`releaseSupersededTemplateFiles`); the
@@ -8334,7 +8334,7 @@ Cross-tenant super-admin view of the BL-12 audit log.
 
 **Deferred (separate ticket):** The legacy `AuditLogTab` in
 `/admin` (synthesizes events from raw table activity via
-`getRecentAuditEvents`) is **not** removed by this PR. Different
+`getRecentAuditEvents`) was **not** removed by PR #150. Different
 data model than the BL-12 `audit_log` table — the legacy tab shows
 derived events (`org_created`, `proposal_updated`) timestamped from
 the originating table's `createdAt`, while the new view shows
@@ -8807,7 +8807,7 @@ Investigations) in **Team Settings → Agent**. Repurpose the in-repo
 footprint as an author-discipline checklist + remove machinery that
 only existed to handle agent-specific behavior.
 
-**Changes in this PR:**
+**Changes (PR #190):**
 - Move `.vercel/agent.md` → `docs/PRE_PUSH_CHECKLIST.md` and reframe
   as a self-review checklist (categories unchanged; intro/history
   updated)
@@ -8858,7 +8858,7 @@ repo that runs only against Vercel Agent activity.
 
 Wiring shipped in PR #193 but the user redirected to "skip Sentry and
 remove any reference" before the merge happened. The merge went
-through anyway by accident. Retired in BL-QC-sentry-retire (this PR).
+through anyway by accident. Retired in BL-QC-sentry-retire (PR #195).
 
 **Why retired:** the user's framing "Sentry is more like an audit log
 than anything else" matched our existing infrastructure exactly —
@@ -9081,7 +9081,7 @@ now exist on production. Audit log persistence works again,
   schema state by running migrations through the ledger
 
 **Acceptance:** ✅ The 7 tables exist on production. /admin and
-/admin/orgs/[id] load. After this PR merges + auto-migrate cold-starts,
+/admin/orgs/[id] load. After PR #202 merged + auto-migrate cold-starts,
 the ledger has 0052 applied. Fresh-DB CI passes (proves migration
 0052 is idempotent + composes with 0000-0051).
 
