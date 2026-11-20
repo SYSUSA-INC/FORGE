@@ -18,7 +18,8 @@
   CODEOWNERS. See §7 of the standards doc.
 - **Backlog:** `docs/BACKLOG.md` is the single source of truth for
   planned work. Every PR referencing `BL-N` must update the backlog
-  entry (enforced by gate).
+  entry (enforced by gate). Its "State of the backlog" section says
+  what is delivered and what is left: read that first.
 
 ## What to flag in review
 
@@ -82,7 +83,10 @@ When writing code yourself (Claude, Cursor, etc.):
    `src/db/schema.ts` AND add a `drizzle/[NNNN]_*.sql` file.
 6. **Conventional commit titles.** `<type>(<scope>)?: <summary>`.
 7. **Reference the BL ticket in the title.** `feat(audit): BL-12c —
-   …`. Then update `docs/BACKLOG.md` in the same PR.
+   …`. Then update `docs/BACKLOG.md` in the same PR: the entry's own
+   `**Status:**` line and the "State of the backlog" section at the
+   top (its date, sha and PR number). Never write "this PR" in a
+   status; write the PR number.
 8. **Diff under 1,500 LOC.** Split larger work into phased PRs.
 9. **One PR at a time.** Strict serial.
 10. **Strict serial — don't bypass gates.** Every check has a reason;

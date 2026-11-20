@@ -61,13 +61,13 @@ because no other CI gate catches them:
   filter pattern suggests per-element discrimination. Replace with
   an early-out (`if (!CONDITION) return/continue`) before the array
   operation. Same for `.map((_, i) => ...)` patterns that ignore
-  the element. Caught on [#153](https://github.com/SYSUSA-INC/FORGE/pull/153).
+  the element. Caught on [#153](https://github.com/SYSUSA-INC/FORGEAXI/pull/153).
 
 - **Drizzle index parity gaps.** When a `CREATE INDEX` (especially a
   partial index with a `WHERE` clause) lands in a SQL migration, the
   matching `index(...)` (with `.where(sql\`...\`)`) must also appear
   in `src/db/schema.ts`. Otherwise `drizzle-kit generate` regenerating
-  from schema would drop the index. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150);
+  from schema would drop the index. Caught on [#150](https://github.com/SYSUSA-INC/FORGEAXI/pull/150);
   now enforced by `npm run check:drift` (BL-TENANT-DRIFT), which also
   catches the reverse, an index declared in `schema.ts` that no
   migration creates.
@@ -75,7 +75,7 @@ because no other CI gate catches them:
 - **Auth gate missing on admin-only pages.** Server components under
   `(app)/` that should be admin-only must call
   `requireOrgAdmin(organizationId)` after `requireCurrentOrg()`, not
-  rely on nav visibility. Caught on [#150](https://github.com/SYSUSA-INC/FORGE/pull/150).
+  rely on nav visibility. Caught on [#150](https://github.com/SYSUSA-INC/FORGEAXI/pull/150).
 
 - **Inbox-parity for `in_app` deliveries.** Anywhere we write a
   `notification_delivery` row with `channel === "in_app"`, we MUST
@@ -83,7 +83,7 @@ because no other CI gate catches them:
   The dispatcher in `src/lib/notification-dispatcher.ts` does both;
   the SLA cron in `src/lib/notification-cron.ts` originally only
   wrote the delivery row, so escalations never reached the inbox.
-  Caught on [#155](https://github.com/SYSUSA-INC/FORGE/pull/155).
+  Caught on [#155](https://github.com/SYSUSA-INC/FORGEAXI/pull/155).
   Rule: if you create a `notification_delivery` with channel
   in_app, the next thing in scope must be the matching `notification`
   insert.
@@ -93,7 +93,7 @@ because no other CI gate catches them:
   matching X to mark them done," the UPDATE must filter by the
   IDs collected from the SELECT, NOT re-apply predicate X. A new
   row inserted between SELECT and UPDATE that also matches X gets
-  marked done without being processed. Caught on [#155](https://github.com/SYSUSA-INC/FORGE/pull/155): the
+  marked done without being processed. Caught on [#155](https://github.com/SYSUSA-INC/FORGEAXI/pull/155): the
   batch materializer's UPDATE used `sentAt IS NULL` instead of
   `inArray(id, pendingIds)`, racing with the dispatcher.
   Rule: select rows → collect their IDs → update where

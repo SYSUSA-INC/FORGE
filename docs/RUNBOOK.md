@@ -22,7 +22,7 @@ Until we have a team, founder is always primary. When we hire, we update this ta
 
 1. **Vercel dashboard** — https://vercel.com (logs, redeploy, env vars)
 2. **Neon console** — https://console.neon.tech (DB metrics, point-in-time restore)
-3. **GitHub** — https://github.com/sysusa-inc/forge (revert PRs, hotfix branches)
+3. **GitHub** — https://github.com/SYSUSA-INC/FORGEAXI (revert PRs, hotfix branches)
 4. **Anthropic console** — https://console.anthropic.com (API usage, rate-limit visibility)
 5. **Resend dashboard** — https://resend.com/emails (email delivery status)
 

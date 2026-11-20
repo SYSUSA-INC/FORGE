@@ -2,7 +2,8 @@
 
 Comprehensive backlog of every capability captured from the platform
 spec discussions. Each item has a stable **BL-N** ID; PR numbers fill
-in as items ship. **Hard rule:** every BL ships complete and
+in as items ship. **Start with "State of the backlog" just below:** it
+says what is delivered, what is left and what waits on whom. **Hard rule:** every BL ships complete and
 production-ready (no scaffolding, no `Coming soon` stubs).
 
 Priority key:
@@ -19,7 +20,194 @@ Effort key:
 
 ---
 
-## Active priorities (2026-06-16)
+## State of the backlog
+
+**As of 2026-11-20, `main` at `f47a862`, through PR #513.** Checked
+against the merged pull requests and the code, not against the entries'
+own wording. If the date or the sha here is old, check `git log` before
+trusting a status below, and correct this section in the same PR.
+
+### The plan
+
+FORGE II (owner, 2026-11-01; `docs/FORGE_II_REQUIREMENTS.md`) makes the
+product follow the proposal lifecycle: **Identify → Evaluate → Capture →
+Plan → Develop → Deliver → Measure**. BL-NAV-LIFECYCLE builds it in
+phases 0 to 9: the menu (0), one phase per stage (1 to 7), the partner
+portal (8) and the pipeline's stage names (9). Beside it run four
+standing tracks: **BL-STAB** (problems the owner found in testing, P0),
+**BL-AIX** (the AI platform's next generation, parked behind BL-STAB),
+**Scout** (finding opportunities: the BL-SCOUT-* entries) and the
+**platform and quality gates** (BL-QC-*, tenancy, billing, sign-in).
+
+### Delivered
+
+| Track | What shipped | PRs |
+|---|---|---|
+| The original backlog, BL-1 to BL-23 | All of it, except the two BL-9 items under "Left" | #102 to #334 |
+| Quality gates, BL-QC-* | Every gate; BL-QC-neon lacks its operator configuration | #146 to #310 |
+| Tenancy and environments | BL-TENANT-AUDIT (v1 and the 2026-09 re-run), BL-TENANT-DRIFT, BL-ENV-SEP's code | #210, #211, #216, #261, #262, #266 |
+| Billing and plans | BL-17 Stripe, BL-PACKAGES and add-ons, BL-AUTH-ABUSE trials, the BL-16 API | #212 to #215, #218 to #222, #317 to #326, #333, #334 |
+| User feedback, BL-FB-* | All 35 items | #245 to #260, #296 to #316, #327 to #330 |
+| AI platform | BL-AI-* (#257), BL-AIP remediation, BL-AIX phases 0a to 2c-1 | #269 to #295, #335 to #358 |
+| BL-STAB | 1, 2, 4a, 6, 7, 9, 10 (except 10c), 11, 8a mandatory two-step sign-in, 8b email validation | #359 to #396, #399, #415, #416, #439 to #448, #450 |
+| The look | BL-UI-THEME, BL-UI-ENABLENOW, BL-UI-UNIFORM, BL-PIPE-DRILL, BL-PIPE-FUNNEL, BL-PIPE-STAGES | #272, #387, #398, #400 to #413, #417 to #420, #481, #482 |
+| BL-VISION-AUTOPILOT phases 1, 3, 4, 5 | BL-CAP-MATRIX, BL-COMPANY-MODEL, BL-LESSONS-LOOP, BL-NEXT-ACTION | #421 to #437 |
+| Scout | QUALITY, REACH, AMEND, ONEPAGE, INBOX phases 1 and 2, FILES, BACKFILL, FIT, LEARN, SHOWN | #455 to #462, #468, #475, #490 to #494 |
+| Sign-in and identity | BL-MFA-RECOVERY, BL-MFA-ADMIN, BL-OPP-SOURCE, BL-DOMAIN-FORGEAXI phases 1 and 2 | #464, #465, #467, #472 |
+| BL-NAV-LIFECYCLE phases 0 to 6 | The menu, Identify, Evaluate, Capture, Plan, Develop, Deliver (migrations 0150 to 0180) | #449, #452, #453, #463 to #510 |
+| Test fixes | `tests/isolation/milestones.test.ts` no longer depends on the hour or on midnight UTC | #511 to #513 |
+
+### Left: in progress or partly shipped
+
+| Entry | What remains | Waits on |
+|---|---|---|
+| BL-STAB-3 | New Solicitation takes several files at once, each classified and filed | Nothing; the owner's decisions are recorded (2026-10-21) |
+| BL-STAB-4b | Each amendment compared with the one before it | Nothing |
+| BL-STAB-5 | Contracting officer Q&A uploaded in the format it was released | Nothing |
+| BL-STAB-8c | A verified mobile phone | The number can be captured now; the text-message step waits on the owner choosing a provider |
+| BL-STAB-8d | Cloudflare in front of the platform | The code side waits on nothing; moving the nameservers is an operator step |
+| BL-STAB-10c | A reserve for the shared SAM.gov key | What the quota logs show |
+| BL-NAV-LIFECYCLE phase 7 | Measure: R-1 to R-3 | A design document for the owner's review; none exists (`docs/design/PHASE_7_AUTHORING_TEMPLATES_OUTPUT.md` is an older, different "Phase 7") |
+| BL-NAV-LIFECYCLE phase 8 | The partner portal: partner accounts, C-8 to C-10, P-6, D-4 for outside reviewers | A design document; none exists |
+| BL-NAV-LIFECYCLE phase 9 | Pipeline stages renamed to the seven stages (L-1) | Phases 7 and 8 |
+| BL-VISION-AUTOPILOT phase 2 | Sources beyond SAM.gov and email; keywords FORGE adopts by itself | The owner, through BL-SCOUT-PORTALS |
+| BL-SCOUT-INBOX phases 3 and 4 | The company's own domain; dedicated portal readers | 3: nothing. 4: the owner naming the portals and supplying sample alerts |
+| BL-9 Slice 2c | The collaboration server deployed and the flag turned on for a pilot company | Operator; the engineering is complete |
+| FORGE II rows not yet ✅ | I-6, L-1, L-3, E-12, E-14, C-2, C-11, P-6, D-4, D-6, R-1 to R-3 (🟡); D-8 (⚠️) | See each row in `docs/FORGE_II_REQUIREMENTS.md` |
+
+### Left: planned and not started
+
+| Entry | What it is | Waits on |
+|---|---|---|
+| BL-SCOUT-GWAC (I-7) | Task orders from the contract vehicles a company holds | The owner: which vehicles first, API or email, how a company records its vehicles |
+| FORGE II C-8, C-9, C-10 | Agreements, templates and e-signature with partners | Phase 8 |
+| FORGE II S-5 | Submission to a portal by FORGE | The owner recorded it for later |
+| FORGE II M-7 to M-11 | Five menu items | The owner has not placed them |
+
+### Left: parked, or waiting on the owner or an operator
+
+| Entry | What it is | Waits on |
+|---|---|---|
+| BL-AIX 2c-2 onward | Section L/M verdicts, learning from a company's corrections, structured Section C, the crosswalk, phases 3 to 6 | Owner, 2026-10-08: stabilization first |
+| BL-16 API Slice 2c | Outbound webhooks | Owner, 2026-10-04: parked |
+| BL-SCOUT-PORTALS | Connectors to commercial and state portals | The owner choosing the first connectors |
+| BL-9 Slice 6 | GovCloud | The move to AWS and a federal or CUI customer (2026-10-04) |
+| BL-17 Slice 5 | Enterprise wire invoices: built, paused | Launch readiness (2026-06-20) |
+| BL-ENV-SEP | Separate production and staging | Operator: `docs/ENVIRONMENTS.md` §10, steps 1 to 9 |
+| BL-QC-neon | A database branch per PR | Operator: `NEON_API_KEY`, `NEON_PROJECT_ID` |
+| BL-DOMAIN-FORGEAXI phase 3 | support@ and sales@ addresses on forgeaxi.com | The owner naming the addresses |
+| BL-TENANT-AUDIT | The quarterly re-run | Due 2026-12; many routes and tables were added since 2026-09 |
+| BL-21 | Help content refresh | Rolling; the queue is empty |
+
+### Open owner decisions
+
+Asked and not answered. A merge is not an answer.
+
+1. **The receipt upload:** also inside the Record submission form, or is
+   "Attach a receipt" afterwards enough?
+2. **Four choices made in phase 6c and never commented on:** every reply,
+   out-of-office notices included, emails up to three people; File as a
+   document is open to any member; each reply that is not automatic
+   spends one monthly AI request; replies filed before #508 keep their
+   header-only label.
+3. **The Delivered list's reply count:** keep "since your last message",
+   or build per-person read tracking (a new table, its own PR)?
+4. **What comes next:** see "Next" below.
+5. **Phase 5d:** is the computed style note enough, or is a summary
+   written by the model wanted as well?
+6. **BL-STAB-8c:** which text-message provider.
+7. **BL-SCOUT-PORTALS and BL-SCOUT-GWAC:** which connectors and which
+   vehicles first.
+8. **BL-AIX (2026-10-04):** CUI or ITAR companies within twelve months;
+   logging prompts and responses with consent; a provider key for an
+   accuracy job in CI.
+
+### Owner and operator steps outstanding
+
+None of these can be confirmed from the repository; each stays here
+until someone says it is done.
+
+- **Before a real send from Deliver:** verify the inbound subdomain
+  (`INBOUND_EMAIL_DOMAIN`, for example bids.forgeaxi.com) in Resend as a
+  sending domain. Until then every real send is refused.
+- **Migrations:** sync 0151 to 0180 on `/admin/migrations`, in order.
+- **Phase 6 has not been exercised for real.** Nothing in it has been
+  clicked through in a browser, no real email has been sent or received,
+  the `delivery_reply` prompt has never run against a real model, and
+  the reply headers (In-Reply-To, References) are confirmed from the
+  mail library's types only.
+- **Once by hand, with the `CRON_SECRET` bearer:** `/api/cron/style-notes`
+  and `/api/cron/partner-invites`.
+- **Before web research or search packs go live:** web search enabled
+  for the Anthropic organization in the Claude Console; `charge.refunded`
+  added to the Stripe webhook endpoint's events; the #500 checklist run
+  in Stripe test mode.
+- **`AWARDS_INTEL_ENABLED=1`** in Vercel, for partner search and the
+  agency history.
+- **The bid inbox:** the Exchange and Microsoft Graph setup in
+  `docs/ADMIN_MANUAL.md` §3.7.
+- **The Evaluate upload failure:** the bucket's CORS and a network check
+  (Admin → Jobs → File storage).
+- **Scout thresholds** (`src/lib/scout-fit.ts`, `scout-learn.ts`,
+  `scout-logic.ts`) are untuned defaults, awaiting one company's run
+  note.
+- **BL-STAB-8a rollout:** raise `auth.session_epoch` at release and set
+  `SIGNUP_MODE=invite_only` in production.
+- The operator rows in the table above: BL-ENV-SEP, BL-QC-neon, BL-9
+  Slice 2c, the BL-STAB-8d nameservers.
+
+### Phase 6 known limits
+
+True on `main` and not scheduled:
+
+- a send whose job dies with its instance three times stays "Sending…";
+- a retry by hand is a new row;
+- a receipt cannot be removed, and adding one is read-then-write;
+- filing a reply is not transactional;
+- inbound mail is not routed by In-Reply-To, and `routeReply` may tie a
+  later reply to an answer row;
+- replies filed before #508 are not re-read;
+- an answer does not quote the message it answers;
+- Pipeline → Deliver counts replies "since your last message", not per
+  person, and its sign-off line counts colour teams only.
+
+### Next
+
+**The order is not decided.** The owner has not chosen between:
+
+- **the remaining BL-STAB items** (3, 4b, 5, 8c, 8d), which this
+  backlog's own rule puts first: BL-STAB is P0, and "new development
+  waits until this list is done" (2026-10-08). In practice the Scout
+  work and BL-NAV-LIFECYCLE were built after BL-STAB-8b at the owner's
+  direction, so the rule no longer describes the order;
+- **phase 7, Measure**, which FORGE II's own order names next. It needs
+  a design document for the owner's review before any code.
+
+Also offered and not asked for: a one-line fix for the flaky
+`tests/isolation/partner-invite.test.ts:82`, as its own PR.
+
+### How to keep this current
+
+1. Every PR that ships backlog work updates **this section and its own
+   entry** in the same PR: move the row from "Left" to "Delivered", and
+   change the date, the sha and the PR number in the first line.
+2. **Never write "this PR"** in a status, nor "next PR", "in review" or
+   "in its own PR". They are stale the moment the PR merges. Write the
+   PR number once the PR is open, or "PR for `<branch>`" until then.
+3. Every `### BL-…` entry has a `**Status:**` line under its heading.
+4. A decision the owner has not answered stays under "Open owner
+   decisions" until the owner answers it in words.
+5. Shipped entries are kept, with their status corrected. Nothing is
+   deleted.
+
+---
+
+## Shipped log, 2026-06 to 2026-11
+
+The table that used to head this file as "Active priorities
+(2026-06-16)", kept as history with its statuses corrected on
+2026-11-20. It is not the list of what is active: that is the section
+above.
 
 | # | Item | Priority | Effort | Status |
 |---|---|---|---|---|
@@ -29,7 +217,7 @@ Effort key:
 | 3a | **BL-PACKAGES Slice 1** — AI token cap enforcement at gateway | P1 | M | ✅ shipped (PR #212) — gateway + 5 server-action callers |
 | 3b | **BL-PACKAGES Slice 2** — Migrate 7 lib-helper AI callers | P1 | M | ✅ shipped (PR #213) — 100% tenant AI paths token-capped |
 | 3c | **BL-PACKAGES Slice 3** — Super-admin usage panel: per-tenant token consumption | P1 | M | ✅ shipped (PR #214) |
-| 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout pending BL-17 |
+| 3d | **BL-PACKAGES Slice 4** — Public pricing page | P1 | M | ✅ shipped (PR #215) — checkout came with BL-17 (PR #220 to #222) |
 | 3e | **BL-PACKAGES add-ons Slice 1a** — À la carte catalogue (`tier_addon`), tenant grants (`tenant_addon`) raising the AI token cap / unlocking features, super-admin management | P1 | M | ✅ shipped (PR #317) |
 | 3f | **BL-PACKAGES add-ons Slice 1b** — Tenant picker on `/settings/billing` with Stripe Checkout; webhook records / ends grants with their Stripe subscription | P1 | S | ✅ shipped (PR #318) |
 | 3g | **BL-AUTH-ABUSE Slice 1** — Super-admin delete / bulk purge of bot and spam accounts; name rules and self-service bot checks at sign-up | P1 | M | ✅ shipped (PR #319) |
@@ -77,7 +265,7 @@ Effort key:
 | 3av | **BL-STAB-2** — No upload size cap: files go from the browser straight to storage (presigned, tenant-scoped), on every upload path | P0 | L | ✅ shipped (six phases; 2a shipped in PR #361, #362 and #363; 2b shipped in PR #364; 2c shipped in PR #365 and #368; 2d-1 shipped in PR #369; text files read as 0 bytes fixed in PR #374; 2d-2 (the upload sweep) shipped in PR #389; 2d-3 (GSA attachments) shipped in PR #390; 2e-1 (knowledge corpus) shipped in PR #391; 2e-2 (one storage meter, Office zip checks) shipped in PR #392; 2f-1 (files removed on delete, Word templates) shipped in PR #393 and #394; 2f-2 (chat attachments) shipped in PR #395; 2f-3 (contacts import in parts, paste guards; the last phase) shipped in PR #396) |
 | 3aw-0 | **BL-STAB-9** — The AI document review (BL-23) fails with "requirements / capabilityAreas / evaluationFactors: expected array, received undefined": the review builds on the parse, a cut-off AI answer says so (every feature), the matrix scores in windows | P0 | M | ✅ shipped (9a PR #366, 9b PR #367) |
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | ✅ shipped: 7a #370, 7b #371, 7c #372, 7d #373, 7e #388 |
-| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | 🔄 10a shipped (PR #375); 10b (comma lists = any of, matched keywords and NAICS shown, a nightly copy of SAM.gov's public descriptions) in progress — the health-probe cap shipped (PR #376), comma lists and matched keywords/NAICS shipped (PR #377, #378); the nightly copy of SAM.gov's descriptions shipped (PR #379); its admin page in PR #380 |
+| 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | ✅ shipped: 10a (PR #375); 10b (PR #376 to #383, and 10b-4 in PR #385); 10d (PR #385); 10e (PR #386). 10c (a reserve for the shared key) waits on what the quota logs show |
 | 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | ✅ shipped (#399) |
 | 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | ⏳ queued (after BL-STAB-8; owner decisions 2026-10-21 recorded) |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
@@ -86,25 +274,25 @@ Effort key:
 | 3be | **BL-UI-ENABLENOW** — FORGE takes the EnableNow design system's look: its colours (supporting colours included), Host Grotesk and Geist Mono, hairline cards, its buttons and radius, the diamond mark, its dark theme (owner, 2026-10-21) | P1 | M | ✅ shipped (#398) |
 | 3bf | **BL-UI-UNIFORM** — One accent, readable ink and status tones, no leftover chrome; palette moved to `theme.colors` so stock Tailwind hex cannot leak (owner, 2026-10-22) | P1 | M | ✅ shipped: A (#400, #401), B (#402), C1–C10, D (emails), the manuals and the Command Center pass (#400–#417); C11 tables (#481); C12 secondary actions as links, one button scale, boxed rows onto hairlines (#482) |
 | 3bg | **BL-PIPE-FUNNEL** — The pipeline as a clickable funnel: one tapering segment per stage from Identified to Won, width = how many reached the stage, the conversion between stages, the win rate and a way into lessons from lost bids (owner, 2026-10-24) | P1 | S | ✅ shipped (#418, #419) |
-| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; phase 5 (BL-NEXT-ACTION) shipped; 2 to be sized |
+| 3bh | **BL-VISION-AUTOPILOT** — FORGE learns each customer's business and, step by step, owns more of the proposal lifecycle: scouts every publishing site, prioritises with reasons, builds a capability matrix on request, and feeds lessons from every outcome into the next proposal (owner vision, 2026-10-24) | P1 | XL | 🔄 phases 1 (BL-COMPANY-MODEL), 3 (BL-CAP-MATRIX) and 4 (BL-LESSONS-LOOP) shipped; phase 5 (BL-NEXT-ACTION) shipped; phase 2 partly delivered through the Scout work (#458 to #462, #492); connectors for other portals are BL-SCOUT-PORTALS |
 | 3bi | **BL-PIPE-STAGES** — Opportunity stages renamed to the reference funnel's (Identified · Evaluated · Qualified · Captured · Developed · Submitted · Closed-Won · Archived); Writing merges into Developed; Lost and No bid stay apart under Archived (owner, 2026-10-24) | P1 | S | ✅ shipped (#420) |
-| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (this PR); design approved 2026-10-25 |
-| 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (this PR) |
-| 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (this PR) |
-| 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (this PR) |
-| 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): taken off the Scout page until it is built |
-| 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | 🔄 this PR; then BL-SCOUT-AMEND (amendment watch) |
+| 3bj | **BL-CAP-MATRIX** — Capability matrix as a questionnaire: FORGE drafts the questions from the RFP/RFI's requirements, the customer answers them, and the answers give a coverage score, say whether a partner is needed, and feed PWin (owner, 2026-10-24; design for approval) | P1 | M | ✅ shipped: A #422, B #423, C #424, Qualified list coverage (#425); design approved 2026-10-25 |
+| 3bk | **BL-COMPANY-MODEL** — FORGE's own account of what the company does (capabilities with evidence, what it does under each NAICS, customers, differentiators, gaps, partners, derived keywords), drafted from the profile, the Brain, outcomes and confirmed questionnaires, approved by a person, kept current, and read by the scout, the questionnaire and the drafter (BL-VISION-AUTOPILOT phase 1) | P1 | L | ✅ shipped: design #426, 1a #427, 1b #428, 1c readers (#429) |
+| 3bl | **BL-LESSONS-LOOP** — Lessons from every outcome as a record FORGE keeps per opportunity: drafted from the outcome, the debrief, the winner analysis and the reviews, confirmed by a person, read back by the drafter, the evaluation tab and the pursuit brief, and shown closing the loop when a later bid that applied one is won (BL-VISION-AUTOPILOT phase 4) | P1 | L | ✅ shipped: design #430, 4a #431, 4b #432, 4c the loop (#433) |
+| 3bm | **BL-NEXT-ACTION** — FORGE proposes the next action for every pursuit at every stage (rules over the pursuit's state, with the reason and where to do it), prepares the preparable ones overnight (outline, questionnaire, compliance map, section drafts as tracked insertions, health scan) for a person to accept, and shows what was done with its proposals (BL-VISION-AUTOPILOT phase 5) | P1 | L | ✅ shipped: design #434, 5a #435, 5b #436, 5c preparing ahead (#437) |
+| 3bn | **BL-SCOUT-GWAC** — GWACs as a Scout source: bring in task orders from the contract vehicles a company holds (GSA MAS, OASIS+, Alliant, SEWP and the like) | P2 | L | ⏳ queued (owner, 2026-11-03): not started; shown as *soon* on the Scout source bar until it is built |
+| 3bo | **BL-SCOUT-QUALITY** — Scout stops filling the page with junk: one card per solicitation, the keyword weighed by where and how often it appears, a score earned from zero and kept current, only what the AI recommends shown, unreviewed finds held apart | P0 | M | ✅ shipped (PR #455) |
 | 3bp | **BL-SCOUT-REACH** — Scout misses opportunities in the company's own codes: keywords are an exact-phrase filter, and only the first 100 notices per NAICS code are read, with no word when more were cut off | P0 | S | ✅ shipped (PR #456, owner chose: keywords rank) |
 | 3bq | **BL-SCOUT-AMEND** — The amendment watch: every open opportunity's solicitation is checked daily on SAM.gov; new amendments and documents are filed on the opportunity, the response date follows a new amendment, and the owner and assigned team are told | P0 | M | ✅ shipped (PR #457) |
-| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; this PR, eBuy and GSA email rows) |
-| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🔄 by email: BL-SCOUT-INBOX (owner, 2026-11-06) |
-| 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); 🔄 phase 2 (read bids into finds) this PR; then 3 the company's own domain; 4 dedicated portal readers |
-| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 ✅ #493 (BL-SCOUT-LEARN); D (BL-SCOUT-SHOWN) ✅ #494; then Phase 5c (the review meeting) 🔄 its own PR, strict serial (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
-| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address (this PR), closing 8b; then 8c, 8d |
-| 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (after BL-STAB-2) |
+| 3br | **BL-SCOUT-ONEPAGE** — Scout as one page (FORGE II, footnote 3): a source bar, one search bar for the nightly scout, one compact results list for every source with Add to pipeline on each row | P0 | M | ✅ shipped (PR #458, the frame; PR #459, eBuy and GSA email rows) |
+| 3bs | **BL-SCOUT-PORTALS** — Enterprise portals as Scout sources: state portals, primes' supplier portals, commercial aggregators (owner's picks, 2026-11-06) | P1 | L | 🟡 the email route shipped as BL-SCOUT-INBOX (#460 to #462; owner, 2026-11-06); connectors to other portals wait on the owner's choice |
+| 3bt | **BL-SCOUT-INBOX** — The company's bid email address: portals mail FORGE directly (no forwarding), each email received, read, and its bids made Scout finds | P0 | L | ✅ phase 1 (receive, Bid inbox; #460); ✅ phase 2 (read bids into finds; #461) and the Exchange mailbox (#462); ⏳ not started: 3 the company's own domain; 4 dedicated portal readers |
+| 3bu | **BL-SCOUT-BACKFILL** — Scout's first run (and a button) reads everything still open in the company's codes, not three days: a year back, paged past 1,000, the best 500 kept. Then BL-SCOUT-FIT (capability fit from the company model, no keyword-only junk) and BL-SCOUT-SHOWN (show more by default, found-vs-shown counts) | P0 | M | A ✅ #490; C ✅ #492 (BL-SCOUT-FIT); C2 ✅ #493 (BL-SCOUT-LEARN); D (BL-SCOUT-SHOWN) ✅ #494; all shipped (owner, 2026-11-10: no wider NAICS/PSC net — relevance first) |
+| 3bc | **BL-STAB-8** — Security gates: mandatory MFA, email validation on every way in, verified mobile phone, Cloudflare in front of the platform | P0 | L | 🔄 8a-0 shipped (#415, #416, #439, #440); 8a design approved (#441); 8a-1 #442; 8a shipped (#441–#445); 8b design #446; 8b-1 #447; 8b-2 #448; 8b-3 change of address #450, closing 8b; then 8c, 8d |
+| 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (BL-STAB-2 has shipped; not started) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
-| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
+| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ operator deploy not done; the engineering is complete |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
 | 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
 | 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
@@ -135,7 +323,7 @@ Effort key:
 Before the first paying customer onboards, production must be isolated from staging/dev so a developer error cannot touch real customer data. Operator runbook in `docs/ENVIRONMENTS.md`; production-deploy gate in `docs/PRODUCTION_DEPLOY_GATE.md`. The code-side guards are in; what remains is the one-time operator setup the runbook walks through.
 
 ### BL-TENANT-AUDIT — Multi-tenant data firewall audit
-**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  🚧 2026-09 quarterly re-run + CI gates (PR #261)
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** ✅ v1 shipped (PR #211, `docs/audits/06-multi-tenant-firewall-2026-06.md`, PASS)  ·  ✅ 2026-09 quarterly re-run + CI gates (PR #261, `docs/audits/07-multi-tenant-firewall-2026-09.md`, PASS)  ·  next quarterly re-run due 2026-12
 
 **2026-09 re-run (PR #261):** the codebase grew from 14 to 20 API routes
 and 32 to 43 tenant-scoped tables since June, and Phases A–C moved most
@@ -200,7 +388,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · 🔄 BL-STAB-11 in review · ⏳ BL-STAB-3, 5 and 8 queued (owner, 2026-10-08: the reported errors first — 9, 7, then the rest of 2)
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ✅ BL-STAB-10 shipped (10a in PR #375, 10b in PR #376 to #383 and #385, 10d in PR #385, 10e in PR #386; 10c, a reserve for the shared key, waits on the quota logs) · ✅ BL-STAB-11 shipped (PR #399) · 🔄 BL-STAB-8 (8a shipped in PR #415, #416 and #439 to #445; 8b shipped in PR #446 to #448 and #450; 8c verified mobile phone and 8d Cloudflare not started) · ⏳ BL-STAB-3 (after BL-STAB-8; owner, 2026-10-21), 4b and 5 not started
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -579,7 +767,7 @@ mind. Bandage will come off but a true fix will stay."
         being checked now cancels it on screens with no filing step; a
         stored, unfiled file removed from any upload list is deleted at
         once. 300 seconds per request.
-      - **Review of this PR (5 of 14 upheld):** removing a stored upload
+      - **Review of PR #390 (5 of 14 upheld):** removing a stored upload
         from a list (a cancel) could delete the file of a record whose
         save landed but reported an error — `cancelUpload` now never
         touches a file a record holds (the sweep finishes that filing);
@@ -744,7 +932,7 @@ mind. Bandage will come off but a true fix will stay."
         and the delete was cascaded without its file — every delete of a
         solicitation, document or knowledge file now also releases that
         kind's uploads whose records are gone (`releaseOrphanedClaims`,
-        which also clears files left by deletes made before this PR); a
+        which also clears files left by deletes made before PR #394); a
         template save that landed but reported an error is now kept, and
         any file an earlier attempt left on a template is released at its
         next replace or clear (`releaseSupersededTemplateFiles`); the
@@ -857,8 +1045,8 @@ mind. Bandage will come off but a true fix will stay."
         refusal advised splitting text that could never fit (the limit is
         the document's: `goldTextRefusal` says how much still fits); the
         summary rows omitted 2f-3.
-- **BL-STAB-10 — Import from SAM.gov ignores the keyword.** 🔄 10a shipped
-  (PR #375); 10b in progress.
+- **BL-STAB-10 — Import from SAM.gov ignores the keyword.** ✅ shipped: 10a
+  (PR #375), 10b (PR #376 to #383, #385), 10d (PR #385), 10e (PR #386); 10c open.
   - **Symptom (owner, 2026-10-10):** NAICS 541519 + "ServiceNow" listed 10
     award notices and a sources sought, none about ServiceNow.
   - **Root cause:** SAM.gov's public search has no keyword parameter (only
@@ -943,7 +1131,7 @@ mind. Bandage will come off but a true fix will stay."
         tag-shaped markup only and numeric entities in `plainText` /
         `readableText`; the recompete radar sees the copy's text; the
         scout's keyword fit reads across line breaks.
-    - **10b-4 (PR #385):** log the key's remaining requests from the
+    - **10b-4 (shipped, PR #385):** log the key's remaining requests from the
       gateway's rate-limit headers (`x-ratelimit-limit`,
       `x-ratelimit-remaining`, `retry-after`; digits only), only on
       replies to FORGE's own key: `[samgov] quota` once per credential,
@@ -977,7 +1165,7 @@ mind. Bandage will come off but a true fix will stay."
       take the 6-digit code or are named, never guessed; generic
       keywords are flagged; a decision made while a run clears its find
       is kept.
-  - **10e (PR #386) — the scout's AI triage judges scope, not codes.**
+  - **10e (shipped, PR #386) — the scout's AI triage judges scope, not codes.**
     Owner's report (2026-10-13): an EPA SBIR BAA under NAICS 541715 was
     triaged "Pursue · 75%" because the code was in the list and the
     set-aside fit; the triage saw only keywords, codes and set-asides,
@@ -1069,7 +1257,7 @@ mind. Bandage will come off but a true fix will stay."
       the missing ones; re-running the review keeps the matrix; a
       malformed cell or question is dropped, not the answer.
 - **BL-STAB-7 — SAM.gov sync fails with an invalid key, and there is
-  nowhere to set one.** 🔄 7a shipped (PR #370); 7b shipped (PR #371); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388).
+  nowhere to set one.** ✅ shipped: 7a (PR #370); 7b (PR #371, follow-up PR #384); 7c shipped (PR #372); 7d shipped (PR #373); 7e shipped (PR #388).
   - **Symptom:** Import from SAM.gov and Settings → SAM.gov sync show
     "SAM.gov 401: `<html><body><h1>API_KEY_INVALID</h1>…`". The owner:
     "there has to be a place where the company admin can update their
@@ -1149,8 +1337,8 @@ mind. Bandage will come off but a true fix will stay."
     and re-encryption counts it apart, with the advice to restore the
     value rather than remove keys.
 - **BL-STAB-8 — Security gates for a platform holding sensitive
-  data.** 🔄 next (added 2026-10-08; owner, 2026-10-21: next, now
-  that BL-STAB-2 has shipped).
+  data.** 🔄 8a ✅ (#415, #416, #439 to #445), 8b ✅ (#446 to #448, #450); 8c, 8d not
+  started (added 2026-10-08; owner, 2026-10-21: next after BL-STAB-2).
   - **Ask (owner):** "We need to enforce some security gates for
     signup, MFA mandatory, Email validation, mobile phone validation,
     and Cloudflare implementation to ensure we are protecting the
@@ -1232,7 +1420,7 @@ mind. Bandage will come off but a true fix will stay."
       recovery codes, or for new devices in 8a.
     - **Factors:** up to 3 per user (authenticator apps and passkeys
       together) and 10 single-use recovery codes, regenerated on demand.
-  - **8a-0 foundations (in progress):** the fixes below ship as small
+  - **8a-0 foundations (shipped: #415, #416, #439, #440):** the fixes below ship as small
     PRs ahead of the MFA work. Done: `safeRedirectTarget` rejects
     backslashes (`/\evil.com`) and is now plain UTF-8 with a test
     (#415). Password sign-in is rate-limited per email (10 per 15
@@ -1252,9 +1440,9 @@ mind. Bandage will come off but a true fix will stay."
     with 409 before the token is spent and the account's next sign-in
     accepts the invite; a self-service sign-up for an unverified account
     changes nothing and re-sends the verification email, so nobody can
-    seed the password the inbox's owner then verifies into (this PR).
-    Still to do, with 8a: ending open sessions on disable or password
-    reset (needs a session version).
+    seed the password the inbox's owner then verifies into (#440).
+    Ending open sessions on disable or password reset shipped with
+    8a-2 (#443, the session version).
   - **Found while mapping (2026-10-21), to fix with or before 8a:** in
     invite-only mode a password user's first Google/Microsoft sign-in
     deletes their account (Auth.js fires `createUser` on the link-by-email
@@ -1265,7 +1453,7 @@ mind. Bandage will come off but a true fix will stay."
     account's password and self sign-up can overwrite an unverified one;
     password sign-in has no rate limit and the limiter fails open;
     `safeRedirectTarget` lets `/\evil.com` through.
-  - **8a-2 delivered (this PR):** `src/lib/session-policy.ts` (pure,
+  - **8a-2 delivered (#443):** `src/lib/session-policy.ts` (pure,
     tested: the claims, `evaluateSession` with the 8-hour idle, 24-hour
     absolute and 10-minute pending limits and the end of pre-policy
     tokens, `touchSession`, `needsRecheck`, `mfaEnforcement` with the
@@ -1341,7 +1529,7 @@ mind. Bandage will come off but a true fix will stay."
       banner to everyone; `MFA_PREVIEW_BYPASS_CODE` is accepted as a code
       only when `VERCEL_ENV=preview`. Google / Microsoft sign-ins take
       the same second step.
-    - **8a-3 — passkeys** (this PR). Register and sign in with WebAuthn
+    - **8a-3 — passkeys** (#444). Register and sign in with WebAuthn
       (platform and roaming authenticators) as a second factor beside
       the authenticator app, within the three-factor cap:
       `@simplewebauthn/server` and `/browser` v9 (the versions
@@ -1356,7 +1544,7 @@ mind. Bandage will come off but a true fix will stay."
       enrol page with the app option hidden, and the server refuses to
       pass the step on an app alone. Verified end to end with a virtual
       authenticator (Playwright CDP).
-    - **8a-4 — the reset, the rollout and the manuals** (this PR).
+    - **8a-4 — the reset, the rollout and the manuals** (#445).
       SuperAdmin → Platform users → **Reset MFA…** with a written reason
       (10–500 characters): every factor and recovery code removed, the
       enrolment and any pending pass marker cleared, `session_version`
@@ -1377,7 +1565,7 @@ mind. Bandage will come off but a true fix will stay."
       15 minutes before; the editors already autosave); (4) SMS as a
       factor waits for the provider (as decided), so 8a ships with the
       authenticator app and passkeys.
-  - **8b design (proposed 2026-11-01; approved by merging this PR).**
+  - **8b design (proposed 2026-11-01; approved by merging #446).**
     What is true today, from the code. **Password sign-in** refuses an
     account whose address is unverified (`authorize`). **Self-service
     sign-up** emails a verification link (24 hours) and refuses
@@ -1402,7 +1590,7 @@ mind. Bandage will come off but a true fix will stay."
       not travel through the inbox proves nothing; the address is
       checked for deliverability before an email is ever sent to it;
       a changed address is a new address.
-    - **8b-1 — the gate** (this PR). Shipped as designed with one
+    - **8b-1 — the gate** (#447). Shipped as designed with one
       simplification: the "went by email" flag lives on the token row
       alone (`verificationToken.sent_by_email`, set by `markTokenSent`
       when the invite, reset or verification email actually went; read
@@ -1436,7 +1624,7 @@ mind. Bandage will come off but a true fix will stay."
       when it is true. The unverified-purge keeps its 7-day rule and
       its "alone in every workspace" guard, so an invitee who never
       verified is not deleted from under a workspace.
-    - **8b-2 — deliverability** (this PR). Shipped as designed, with one
+    - **8b-2 — deliverability** (#448). Shipped as designed, with one
       addition: a canary. A domain that comes back "no such domain / no
       records" is refused only when the resolver can also find
       `sysgov.com` (`EMAIL_DELIVERABILITY_CANARY` overrides); a resolver
@@ -1462,7 +1650,7 @@ mind. Bandage will come off but a true fix will stay."
       the invite still allowed (the admin may know better), recorded on
       the audit row. Unit-tested with a stubbed resolver; a tiny
       runtime test against a known domain is skipped offline.
-    - **8b-3 — change of address** (this PR). Shipped as designed:
+    - **8b-3 — change of address** (#450). Shipped as designed:
       `src/lib/email-change.ts` (pure rules, tested), `email-change-store`
       (the pending change on the user row, migration 0144; a 24-hour
       `change-email` token keyed by the new address; `confirmEmailChange`
@@ -1503,8 +1691,8 @@ mind. Bandage will come off but a true fix will stay."
       release backfills the stamp for accounts that hold a provider
       link, because the provider verified them; the rest are asked at
       their next sign-in.
-- **BL-STAB-3 — New Solicitation accepts one file.** ⏳ queued, after
-  BL-STAB-2.
+- **BL-STAB-3 — New Solicitation accepts one file.** ⏳ not started; queued
+  after BL-STAB-8 (owner, 2026-10-21).
   - **Ask:** Upload several files at once; FORGE decides what each is
     and how to file it.
   - **Fix:**
@@ -1555,7 +1743,7 @@ mind. Bandage will come off but a true fix will stay."
       and each is filed with its type and parsed; its requirements are
       merged as before.
 - **BL-STAB-5 — Q&A in the format the contracting officer released
-  it.** ⏳ queued, after BL-STAB-2.
+  it.** ⏳ not started (BL-STAB-2, which it waited on, has shipped).
   - **Ask:** Accept Word, Excel, PDF or text. FORGE should make sense
     of it and give suggestions based on the Q&A.
   - **Fix:**
@@ -1567,7 +1755,7 @@ mind. Bandage will come off but a true fix will stay."
     - Suggestions say what the response should change because of each
       answer.
 - **BL-STAB-11 — Superadmin pages fail with "malformed array literal".**
-  🔄 in review.
+  ✅ shipped (PR #399).
   - **Found (2026-10-21):** loading every page in both themes for the
     colour review. `/admin/orgs/[id]/activity` failed for any tenant with
     activity; `/admin` and `/admin/orgs/[id]` failed whenever a
@@ -2603,7 +2791,7 @@ defect in the assessment plus its neighbours:
   decisions, the track and the profile are per organization; an import
   creates the opportunity in the deciding organization only and grades
   the call; a decided candidate cannot be decided again.
-- Part ii (nightly PWin snapshots + "PWin movers") follows as its own PR.
+- Part ii (nightly PWin snapshots + "PWin movers") shipped (PR #291).
 
 **BL-AIP-5b (part ii) — the golden eval set** ✅ (PR #283)
 
@@ -2664,7 +2852,7 @@ defect in the assessment plus its neighbours:
 - **Prompt versions are real.** `SECTION_DRAFT_PROMPT_VERSION` is
   passed on every section-draft call (draft action, streaming route,
   citation verifier) — `ai_call_log.prompt_version` was never populated
-  before. Part ii (next PR) adds the golden eval set that keys on it:
+  before. Part ii (PR #283) adds the golden eval set that keys on it:
   sections of won proposals re-drafted with the saved body withheld and
   scored deterministically against the winning text, one `ai_eval_run`
   row per run keyed by prompt version + model, run from **Settings →
@@ -2846,6 +3034,7 @@ out to deliver; new AI work starts a new ticket.
 ---
 
 ### BL-SCOUT-QUALITY — Scout raises real finds, not every notice that names a keyword
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #455)
 
 **Owner, 2026-11-03:** two cards for one Marine Corps RFI (Amendments 03
 and 04), both "Scored · not triaged", fit 65 for a single mention of
@@ -2857,7 +3046,7 @@ the score was frozen at the first run (a find due tomorrow kept its old
 number); the AI review covered only the ten best new finds of a run, so
 the rest were shown unjudged among the judged ones.
 
-**Shipped (this PR).** `src/lib/scout-logic.ts`: `keywordStrength` (in
+**Shipped (PR #455).** `src/lib/scout-logic.ts`: `keywordStrength` (in
 the title or three mentions strong; twice, once in a short notice, or in
 an earlier notice of the solicitation moderate; once in a long
 description, over 800 characters, or only in the agency's name weak),
@@ -2886,7 +3075,7 @@ stays behind the plan's general AI switch (`aiAutoDraft`, which also
 gates chat, the company model and loss intelligence); a separate switch
 would be a pricing change.
 
-**Next: BL-SCOUT-AMEND — the amendment watch** (owner, 2026-11-03). When
+**Next: BL-SCOUT-AMEND — the amendment watch** (owner, 2026-11-03; ✅ shipped, PR #457). When
 the scout, or a daily check of every open opportunity with a SAM.gov
 notice, finds a new notice of a solicitation in the pipeline: download
 every published attachment (size cap and storage limit as today), file
@@ -2901,6 +3090,7 @@ Go / No-Go decision, a No-Go stops the watch.
 ---
 
 ### BL-SCOUT-AMEND — The amendment watch
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #457)
 
 **Owner, 2026-11-03:** "as the scout runs and finds amendments to any
 solicitation that we have decided to go on, it must automatically
@@ -2909,7 +3099,7 @@ to the opportunity and notify the team". Decisions: watch every open
 opportunity; tell the owner and everyone assigned to its proposal or
 review teams.
 
-**Delivered (this PR):**
+**Delivered (PR #457):**
 - `src/lib/amendment-watch.ts` — `checkOpportunityNotices` asks SAM.gov
   for every notice of the opportunity's solicitation
   (`fetchSamNoticesForSolicitation`, `solnum`, the last year, inactive
@@ -2959,12 +3149,13 @@ review teams.
   new file). USER_MANUAL §5.4 Overview, §5.2.1, What's new;
   ADMIN_MANUAL §5.
 
-**Later:** a No-Go in Evaluate (phase 2) stops the watch, as won, lost
-and no-bid do now.
+**Since #463:** a NO-GO in Evaluate stops the watch, as won, lost
+and no-bid do (it moves the opportunity to No bid).
 
 ---
 
 ### BL-SCOUT-REACH — Scout reads every notice in the company's codes
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #456)
 
 **Owner, 2026-11-05:** "you telling me there are only 3 opportunities
 that meet our criteria out there on SAM.gov — our Scout seems to be
@@ -2995,7 +3186,7 @@ keywords as a filter but match a keyword's words anywhere, (b) every open
 notice in the codes is a find and keywords only raise its score, or (c)
 keep the exact filter. The owner chose (b).
 
-**Delivered (this PR):**
+**Delivered (PR #456):**
 - `src/lib/scout.ts`: with NAICS codes and keywords, the search sends no
   keyword query (`rank`); every open notice in the codes is a find
   (source `org_naics`), scored by `scoutFit`, so the keyword weights of
@@ -3028,6 +3219,7 @@ keep the exact filter. The owner chose (b).
 ---
 
 ### BL-SCOUT-BACKFILL — Scout reads everything open, not three days
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (the backfill PR #490; BL-SCOUT-FIT PR #492, design PR #491; BL-SCOUT-LEARN PR #493; BL-SCOUT-SHOWN PR #494)
 
 **Owner, 2026-11-10:** "It brings 3-5 opportunities when thousands are out
 there … people want to see opportunities relevant to their capabilities."
@@ -3036,9 +3228,9 @@ asked SAM.gov for notices posted in the last 3 days (14 at most) in the
 company's exact NAICS codes, one page of up to 1,000 per code. The
 thousands on SAM.gov are everything *currently open*, which it never read;
 a new tenant saw three days of postings. Relevance was keywords and codes
-only. **Owner decisions:** do A (this PR); no wider net by PSC or related
+only. **Owner decisions:** do A (#490); no wider net by PSC or related
 NAICS (B: "relevant, not junk to sift through"); do C (capability fit from
-the company model) and D (show more by default, found vs shown) next.
+the company model) and D (show more by default, found vs shown) next; all shipped (#492 to #494).
 
 **Delivered (A):**
 - `fetchSamOpportunities` pages with SAM.gov's `offset` (`maxPages` per
@@ -3055,7 +3247,7 @@ the company model) and D (show more by default, found vs shown) next.
   `tests/isolation/scout-backfill.test.ts` (first run pages and caps, the
   next run is the short window, manual backfill, one-off never).
 
-**BL-SCOUT-FIT (C) — delivered (this PR, migration 0168).** Design:
+**BL-SCOUT-FIT (C) — delivered (#492, migration 0168).** Design:
 `docs/design/BL-SCOUT-FIT.md` (merged, #491; all recommended answers).
 `src/lib/scout-fit.ts` (cards, cosine bands, score adjustment; pure),
 `loadFitKit` / `scoreCapabilityFit` in `scout.ts` (cards embedded once per
@@ -3067,7 +3259,7 @@ means not scored. Tests: `tests/ai/scout-fit.test.ts`, the weak-fit cases
 in `tests/ai/scout-logic.test.ts`, `tests/isolation/scout-fit.test.ts`
 (two tenants, opposite capabilities).
 
-**BL-SCOUT-LEARN (C2) — delivered (this PR, migration 0169).** Design:
+**BL-SCOUT-LEARN (C2) — delivered (#493, migration 0169).** Design:
 `docs/design/BL-SCOUT-FIT.md` §2.8, decisions 10-13, plus the C2 addendum
 (which records and reason categories feed it). `src/lib/scout-learn.ts`
 (pure): labelled examples from the tenant's own outcomes weighted by how far
@@ -3085,7 +3277,7 @@ audited `scout.learning.switch` / `scout.learning.reset`; no history
 deleted). Per tenant only; no new AI requests. Tests:
 `tests/ai/scout-learn.test.ts`, `tests/isolation/scout-learn.test.ts`.
 
-**Delivered (D, BL-SCOUT-SHOWN):** a **Best first** view (key `best`,
+**Delivered (D, BL-SCOUT-SHOWN, #494):** a **Best first** view (key `best`,
 first in `SCOUT_LIST_FILTERS`; the existing keys are unchanged): Pursue,
 Watch, not yet reviewed and Related finds together, ordered by `fit_score`
 alone (it already carries the capability band and the learned affinity), the
@@ -3101,11 +3293,12 @@ past the 500-find cap, Weak fit, AI Skip. Counted in the run, so no
 migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 `tests/isolation/scout-fit.test.ts`.
 
-**Next:** Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is merged as #507; 6c-2 (the AI reading of a reply, File as a document; no migration) is merged as #508. 6d is split in two: 6d-1 (Reply from the portal; migration 0180) is merged as #509; 6d-2 (Pipeline → Deliver's two lists; no migration) is in its own PR and completes phase 6.
+**BL-NAV-LIFECYCLE progress through #510** (written here; the entry itself is further down). Phase 5b-1a (#496, migration 0171) and 5b-1b (#497, migration 0172) are merged. 5b-2 (prepaid search packs): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE5B2_SEARCH_PACKS.md`, #498) is approved, all recommended (2026-11-17: one pack of 500 searches for $25, no expiry, the tenant's own cap limits plan searches only, a Stripe refund removes unused searches, org admins on auto-draft plans buy, the price lives in FORGE's catalogue). 5b-2a (#499, migration 0173: the balance, the ledger and the draw) and 5b-2b (#500, migration 0174: Checkout, the webhook, refunds, the Billing page) are merged. 5d (learning) is the last part: 5d-1 (#501, migration 0175: the `ai_draft` snapshot, reviewer-edit capture, the kept share through each review) is merged; 5d-2 (#502, migration 0176: the weekly style note per section kind, read by the drafter and shown on the Draft insights panel) is merged, and phase 5 is complete. Phase 6 (Deliver): the design (`docs/design/BL-NAV-LIFECYCLE_PHASE6_DELIVER.md`, #503) is approved, all recommended (2026-11-17). 6a (migration 0177: the Deliver tab, the sign-off gate, the submission record, Record submission) is merged as #504. 6b-1 (migration 0178: the opportunity's own address, Send from FORGE, the `submission_send` job) is merged as #505; real sends need the owner's DNS step: the inbound subdomain verified in Resend. 6b-2 (downloading the kept copy, the receipt upload, extra uploaded files on a send; no migration) is merged as #506; 6c-1 (replies routed and filed, the Correspondence list; migration 0179) is merged as #507; 6c-2 (the AI reading of a reply, File as a document; no migration) is merged as #508. 6d is split in two: 6d-1 (Reply from the portal; migration 0180) is merged as #509; 6d-2 (Pipeline → Deliver's two lists; no migration) is merged as #510, and phase 6 is complete. Phases 7 to 9 have not started.
 
 ---
 
 ### BL-SCOUT-ONEPAGE — Scout as one page
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #458, the frame; PR #459, eBuy and GSA email rows)
 
 **Owner, 2026-11-06**, quoting FORGE II footnote 3: "a single page that
 combines Import from SAM, paste GSA email, paste from eBuy, enterprise
@@ -3118,7 +3311,7 @@ forms and large cards. **Owner chose:** one source bar, one search bar
 that also saves the nightly scout, one compact results list for every
 source with Add to pipeline on each row.
 
-**Delivered (this PR):**
+**Delivered (PR #458):**
 - **Source bar** on top of the Scout tab: All · SAM.gov · GSA eBuy · GSA
   email · Enterprise portals · GWACs (the last two marked *soon*, each
   saying what is coming and opening the source-request form).
@@ -3138,7 +3331,7 @@ source with Add to pipeline on each row.
   notice must mention, GSA vehicles, notice types), its results in the
   shared rows. Its keyword filters, where the scout's ranks: a search is
   for something specific.
-- **eBuy and GSA email in the shared rows (second PR):** the paste box on
+- **eBuy and GSA email in the shared rows (PR #459):** the paste box on
   top (GSA email with its attachments beneath it), the extracted notice as
   one shared row below it, open on its editable fields, with **Add to
   pipeline** on the row; adding keeps you on the Scout page, and the row
@@ -3152,6 +3345,7 @@ source with Add to pipeline on each row.
 ---
 
 ### BL-SCOUT-PORTALS — Enterprise portals as Scout sources
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** 🟡 the email route shipped as BL-SCOUT-INBOX (PR #460 to #462); connectors to commercial and state portals not started, waiting on the owner's choice of the first ones
 
 **Owner, 2026-11-06:** first state portals, primes' supplier portals and
 commercial aggregators. **Research (2026-11-06; from search results of
@@ -3185,6 +3379,7 @@ access. **To decide:** which first, and whether to approach the vendors.
 ---
 
 ### BL-SCOUT-INBOX — Portals mail FORGE directly
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** 🔄 phase 1 (PR #460), phase 2 (PR #461) and the Exchange mailbox (PR #462) shipped; ⏳ phase 3 (the company's own domain) and phase 4 (dedicated portal readers) not started
 
 **Owner, 2026-11-06:** "I don't want a forwarding address; I want the
 portal to ingest emails directly from the source … a unique Forge domain
@@ -3199,7 +3394,7 @@ postmark configurations … and move to exchange instead"; phase 1 first
 shipped on Postmark's inbound webhook, replaced in phase 2b).
 
 **Phases (one PR each):**
-1. **Receive (this PR).** `inbound_address` and `inbound_email`
+1. **Receive (PR #460).** `inbound_address` and `inbound_email`
    (drizzle/0147). Settings → Integrations → **Bid email address**: an
    admin creates the company's address on FORGE's inbound domain
    (`<company>-<4 random>@INBOUND_EMAIL_DOMAIN`). The Postmark inbound
@@ -3214,7 +3409,7 @@ shipped on Postmark's inbound webhook, replaced in phase 2b).
    `inbound_email.receive`. Mail for an unknown address is dropped with
    200. The **Bid inbox** on Scout → Enterprise portals lists the latest
    50 for org admins (account emails carry sign-up links).
-2. **Read the bids (this PR).** Receiving queues a durable job
+2. **Read the bids (PR #461).** Receiving queues a durable job
    (`inbound_email_parse`, drizzle/0148) for every email but an account
    one. `readInboundEmail` holds an unverified sender (an admin's **Read
    the bids** in the Bid inbox reads it, or an account email, or retries
@@ -3232,7 +3427,7 @@ shipped on Postmark's inbound webhook, replaced in phase 2b).
    attachments (10 at most, storage limit) as solicitations on the new
    opportunity, each parsed; the opportunity gets no notice id. Audit
    `inbound_email.read`.
-2b. **Exchange instead of Postmark (this PR).** The Postmark webhook and
+2b. **Exchange instead of Postmark (PR #462).** The Postmark webhook and
    its settings are gone. `src/lib/inbound-graph.ts` reads FORGE's shared
    mailbox (`INBOUND_MAILBOX`) through Microsoft Graph with an app-only
    token (`MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`,
@@ -3260,6 +3455,7 @@ shipped on Postmark's inbound webhook, replaced in phase 2b).
 ---
 
 ### BL-SCOUT-GWAC — GWACs as a Scout source
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ not started (queued by the owner, 2026-11-03); the owner's decisions are open (which vehicles first, API or email, how a company records the vehicles it holds)
 
 **Owner, 2026-11-03:** GWACs go on the backlog; the Scout page does not
 list them until they are built. **Ask (FORGE II, footnote 3):** Scout
@@ -3277,7 +3473,7 @@ picker on the Scout tab (`src/lib/identify-sources.ts`).
 ---
 
 ### BL-SCOUT-FILES — Add to pipeline brings the notice's documents
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#469); follow-up ✅ merged (#475)
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ merged (#468); follow-up ✅ merged (#475)
 
 **Follow-up (owner, 2026-11-07):** "I am still not able to upload
 multiple documents" under Evaluate. The opportunity's **Add a document
@@ -3385,7 +3581,7 @@ www.forgeaxi.com), and end to end in a browser.
 ---
 
 ### BL-OPP-SOURCE — Where an opportunity came from, and lighter page titles
-**Priority:** P1  ·  **Effort:** S  ·  **Status:** 🔄 in this PR
+**Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #472)
 
 **Owner, 2026-11-07:** "when you create the opportunity page, we need to
 maintain the link to where the opportunity came from, if it is from
@@ -3430,7 +3626,7 @@ backfill run twice against Postgres).
 ---
 
 ### BL-DOMAIN-FORGEAXI — FORGE's address is forgeaxi.com
-**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 in this PR; phase 3 waits on the owner
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ phase 1 shipped (#464); phase 2 shipped (#467); phase 3 waits on the owner
 
 **Owner, 2026-11-06:** "our domain for Forge is forgeaxi.com, and the
 web URL is forgeaxi.com"; the site is https://www.forgeaxi.com. After the move, sign-in broke (owner,
@@ -3445,7 +3641,7 @@ old domain (the browser refuses) and email links pointed there.
   CORS origins name forgeaxi.com; Admin Manual §7.3 explains why old
   passkeys can't move and how to recover (set the variable, redeploy,
   password plus authenticator or recovery code, add a new passkey).
-- **Phase 2 (this PR; owner, 2026-11-07: "the email is still coming
+- **Phase 2 (#467; owner, 2026-11-07: "the email is still coming
   from SYSGOV.com", "the Authenticator app still shows SYSGOV"):** the
   sender and the authenticator name come from the site's address
   (`src/lib/site-domain.ts`, pure, tested): `FORGE <noreply@forgeaxi.com>`
@@ -3461,6 +3657,7 @@ old domain (the browser refuses) and email links pointed there.
 ---
 
 ### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
+**Priority:** P1  ·  **Effort:** XL (one PR or more per phase)  ·  **Status:** 🔄 phases 0 to 6 shipped: 0 the menu (PR #449, corrected in PR #452), 1 Identify (PR #453), 2 Evaluate (PR #463 to #469), 3 Capture (PR #470 to #478), 4 Plan (PR #483 to #487), 5 Develop (PR #488 to #502), 6 Deliver (PR #503 to #510); migrations 0150 to 0180 · ⏳ phase 7 Measure, phase 8 the partner portal and phase 9 the stage names not started, and no design document exists for them
 
 **Owner, 2026-11-01 (FORGE II document):** the everyday sidebar
 follows the proposal lifecycle, **Identify → Evaluate → Capture → Plan →
@@ -3470,10 +3667,10 @@ every opportunity shows where it is; a folding menu gives the page the
 room; the rest of the menu is consolidated. The admin workspaces stay as
 they are.
 
-**Phase 0 — the frame (#449, corrected in this PR).** #449 read the
+**Phase 0 — the frame (#449, corrected in #452).** #449 read the
 document wrong: it flattened the stages beside Pipeline, opened each
 stage on the Opportunities list with a filter, built no chevron, and
-redrew the groups the owner had said to leave alone. This PR replaces
+redrew the groups the owner had said to leave alone. #452 replaces
 it with the document's structure. **Sidebar:** Opportunity Management
 replaces Opportunities with Dashboard and Pipeline; the seven stages
 sit under Pipeline and Scout and Create under Identify (the sidebar
@@ -3502,9 +3699,9 @@ on these pages.
 Every requirement in the FORGE II document, with its status and phase:
 `docs/FORGE_II_REQUIREMENTS.md`.
 
-**Phases to come, one PR each, design reviewed first:**
+**Phases, design reviewed first** (0 to 6 shipped; 7 to 9 to come):
 1. **Identify:** on the Identify page's two tabs.
-   - **1b — Scout, the one-stop page (this PR, with 1a).** The Scout tab keeps the
+   - **1b — Scout, the one-stop page (#453, with 1a).** The Scout tab keeps the
      nightly finds on top, each with **Add to pipeline** and **Not for
      us** (the old Import and Dismiss, same decision and grading), then
      **Bring in an opportunity** with a source picker (`?source=`):
@@ -3520,7 +3717,7 @@ Every requirement in the FORGE II document, with its status and phase:
      matches when its own query is a subset of the page's, so Scout stays
      lit with a source chosen. Stages are unchanged: a find or an import
      lands where it did (Identified, or the notice type's stage).
-   - **1a — Create as one page (this PR, with 1b).** New Opportunity and
+   - **1a — Create as one page (#453, with 1b).** New Opportunity and
      New Solicitation on the Create tab. **Start from a document** uses
      the existing upload and parse (`createSolicitationFromUploadAction`,
      a durable parse job) and hands over to
@@ -3671,7 +3868,7 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/partner-search-logic.test.ts` and
      `tests/isolation/partner-search.test.ts` (USAspending and SAM.gov
      stubbed).
-   - **3b — FORGE AI's ranked partner list (this PR).** No migration.
+   - **3b — FORGE AI's ranked partner list (#473).** No migration.
      **Rank the best 10 with FORGE AI** on the Partners tab
      (`rankPartners`, `src/lib/partner-rank.ts`) runs the 3a-2 search,
      hands the AI the top 25 firms with their facts numbered, plus the
@@ -3728,7 +3925,7 @@ Every requirement in the FORGE II document, with its status and phase:
        and certifications. Audited: `opportunity.partner.invite`, the
        read `opportunity.partner.invite.open`, and
        `opportunity.partner.answers.save` / `.submit` with the contact's
-       email as actor. Not yet: the sweep of expired invites.
+       email as actor. The sweep of expired invites came in 3c-3 (#478).
      - **3c-2 — Compare and the AI's partner rating (✅ shipped (PR #477;
        migration 0157)).** **Compare answers** on the Partners panel opens
        `/opportunities/[id]/partners/compare`: one row per question, our
@@ -3753,7 +3950,7 @@ Every requirement in the FORGE II document, with its status and phase:
        reasons kept, dropped, the order). Advice only: choosing stays on
        the Partners tab. Also: the inviter gets an inbox line
        (`partner_answered`, migration 0157) when a partner submits, once
-       an hour per partner, linking to Compare. Not yet (3c-3): the
+       an hour per partner, linking to Compare. Done in 3c-3 (#478): the
        sweep of expired invites; a Compare column for the partner
        already named on our own answer.
      - **3c-3 — the sweep of expired invites and the partner we named
@@ -3864,7 +4061,7 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/milestone-logic.test.ts` and
      `tests/isolation/milestones.test.ts`.
    - **4b-2 — section due dates, `proposal_section_overdue`, the timeline
-     (this PR).** Migrations 0163 and 0164: `proposal_section.due_date`
+     (#485).** Migrations 0163 and 0164: `proposal_section.due_date`
      (a day, no hours, indexed for the cron) and the `proposal_section_overdue`
      inbox kind; a default rule per tenant for `proposal_section_overdue`
      (in-app + email to the section's owner; a tenant created later gets
@@ -3908,7 +4105,7 @@ Every requirement in the FORGE II document, with its status and phase:
      `tests/ai/section-plan-logic.test.ts`, the timeline cases in
      `tests/ai/milestone-logic.test.ts`, and
      `tests/isolation/section-plan.test.ts`.
-   - **4c-1 (delivered; split from 4c, which would pass 1,500 lines) —
+   - **4c-1 (delivered, #486; split from 4c, which would pass 1,500 lines) —
      the charter, the agreement, the budget and the risks** (P-2, P-6,
      P-7). Migration `0165` adds to `opportunity_plan` the `charter`
      jsonb (strategy, win themes, discriminators, pricing posture, the
@@ -3929,7 +4126,7 @@ Every requirement in the FORGE II document, with its status and phase:
      `claimUpload` / `finishClaim` (`plan_agreement`), downloads at
      `/api/opportunities/[id]/plan-agreement`. Next step after the parts:
      **Sign the charter**. Tests: `plan-charter-logic` and `plan-charter`.
-   - **4c-2 (delivered) — the freeze, Move to Develop and the planned
+   - **4c-2 (delivered, #487) — the freeze, Move to Develop and the planned
      round.** Migration 0166 adds `plan` to `opportunity_decision_kind`
      (alone in its file) and 0167 adds `compliance_matrix_frozen_at`,
      `outline_frozen_at` and `frozen_by_user_id` to `opportunity_plan`.
@@ -3960,14 +4157,14 @@ Every requirement in the FORGE II document, with its status and phase:
 5. **Develop:** Create a draft on the opportunity page (the bootstrap
    exists), external reviewers with section-level access, scheduling
    links for reviews.
-   Design for review: `docs/design/BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md`
+   Design (#488): `docs/design/BL-NAV-LIFECYCLE_PHASE5_DEVELOP.md`
    (5a Develop tab, Create a Draft, ready for Pink; 5b draft all sections
    with research; 5c meetings and invited reviewers; 5d learning). Approved
    by the owner 2026-11-09 with every recommended answer (one-click Create
    a Draft from the plan; research cited by URL, search provider still to
    be named; external reviewers wait for phase 8; meeting link + .ics;
    ready for Pink advisory; learning per tenant only).
-   **5a shipped** (this PR): the opportunity's Develop tab, Create a Draft
+   **5a shipped** (#489): the opportunity's Develop tab, Create a Draft
    (`src/lib/develop-store.ts`, plan-aware wrapper over `createProposalAction`:
    leads from the team, Section L outline, charter win themes; idempotent;
    audit `opportunity.develop.draft_create`), computed Ready for Pink
@@ -3975,9 +4172,9 @@ Every requirement in the FORGE II document, with its status and phase:
    advisory; the AI pre-flight stays at Start review), and the state line
    and next step on Pipeline → Develop. No migration. Sections' authors and
    dates are not copied: the parts table lives on a proposal, so a draft
-   made here starts without them. 5b to 5d remain; 5b waits on the search
-   provider.
-   **5c shipped** (this PR, migration 0170): a review round's meeting
+   made here starts without them. 5b to 5d followed (#495 to #502,
+   below).
+   **5c shipped** (#495, migration 0170): a review round's meeting
    (design §2.4, decision 4 "all recommended"). Four nullable columns on
    `proposal_review`: `meeting_url` (any http(s) link the lead pastes;
    FORGE creates no meeting), `meeting_at`, `meeting_invites_sent_at`,
@@ -4001,9 +4198,9 @@ Every requirement in the FORGE II document, with its status and phase:
    `tests/ai/review-meeting-logic.test.ts`,
    `tests/isolation/review-meeting.test.ts` (tenant B cannot read, set,
    clear or invite for tenant A's round). Not done: a meeting end time
-   (every meeting is one hour), RSVP tracking. Phase 5b waits on the
-   search provider; 5d (learning) comes last (5d-1 below).
-6. **Deliver:** submit from the portal by email, sent from a platform
+   (every meeting is one hour), RSVP tracking. 5b and 5d followed
+   (#496 to #502, below).
+6. **Deliver** (✅ #503 to #510, below): submit from the portal by email, sent from a platform
    address with a per-opportunity reply address; replies received in
    FORGE's Exchange mailbox, read through Microsoft Graph as the bid inbox
    does (BL-SCOUT-INBOX; owner's choice, 2026-11-06), and filed on the
@@ -4013,15 +4210,15 @@ Every requirement in the FORGE II document, with its status and phase:
 8. **The partner portal:** partner accounts scoped to their own answers,
    agreement templates with redlines, e-signature through DocuSign or
    Dropbox Sign rather than built in-house.
-9. **The chevron on every opportunity and proposal**, each stage a link
-   to where that stage's work happens; and the pipeline stage names
+9. **The chevron on every opportunity and proposal** (✅ phase 0, #452), each stage a link
+   to where that stage's work happens; and, not started, the pipeline stage names
    aligned to the seven words (Identified, Evaluated, Captured, Planned,
    Developed, Delivered, Measured, plus Archived).
 
    **5b-1a shipped** (#496, migration 0171; the owner's 2026-11-16
    answers: Claude's built-in web search, not limited to .gov, a per-tenant
-   switch). 5b-1 was split to stay under the diff cap: this PR is the
-   settings, the metering and the gateway; 5b-1b (next, after this merges,
+   switch). 5b-1 was split to stay under the diff cap: #496 is the
+   settings, the metering and the gateway; 5b-1b (#497,
    migration 0172) is the research job, the draft-all wiring and the
    sources reaching the drafter. "Draft all sections" already exists as
    BL-AIX Phase 0c-2 (#338: one durable `section_auto_draft` job per
@@ -4056,9 +4253,9 @@ Every requirement in the FORGE II document, with its status and phase:
    untrusted-text prompt). Feature key `develop_research` (standard class).
    Tests: `tests/ai/research-logic.test.ts`,
    `tests/isolation/research.test.ts`. 5b-2 (prepaid search packs through
-   Stripe Checkout, no overage) follows strictly after 5b-1b.
+   Stripe Checkout, no overage) followed as #498 to #500.
 
-   **5b-1b shipped** (this PR, migration 0172: the `proposal_research`
+   **5b-1b shipped** (#497, migration 0172: the `proposal_research`
    job kind in its own file). `startAutoDraft` queues one research job
    before the section jobs, only when the switch is on, the Anthropic
    provider is active and the allowance is not spent; the pump runs it
@@ -4189,7 +4386,7 @@ Every requirement in the FORGE II document, with its status and phase:
    Not done here, to stay under the diff cap: downloading the kept copy
    (6b; the chosen render stays downloadable from Export). Also later:
    the receipt upload and sending from the portal (6b), replies (6c),
-   Reply and Pipeline → Deliver's two lists (6d).
+   Reply and Pipeline → Deliver's two lists (6d). All followed (#505 to #510).
 
    **6b-1 shipped** (#505, migration 0178; design §2.4, FORGE II
    S-3). **Send from FORGE** on the Deliver tab: To and Cc (the
@@ -4219,7 +4416,7 @@ Every requirement in the FORGE II document, with its status and phase:
    holds Resend's id, not the RFC Message-ID header (6c routes replies
    by the `sub-` address first); a send whose job dies three times
    with its instance stays `Sending…` (check the Cc copy before
-   sending again). **6b-2 next:** the kept copy's download route, the
+   sending again). **6b-2 (#506):** the kept copy's download route, the
    receipt upload and extra uploaded files (convention 11).
 
    **6b-2 shipped** (#506, no migration). A new upload resource
@@ -4266,7 +4463,7 @@ Every requirement in the FORGE II document, with its status and phase:
    Tests: `tests/ai/correspondence-logic.test.ts`,
    `tests/isolation/correspondence.test.ts`. Not routed by
    `In-Reply-To`: FORGE holds Resend's id, not the Message-ID header,
-   and replies come to the `sub-` address anyway. **6c-2 next:** the
+   and replies come to the `sub-` address anyway. **6c-2 (#508):** the
    AI reading (feature `delivery_reply`: receipt, question, amendment,
    evaluation notice, award, unsuccessful; a date named; "Record the
    outcome" as a suggestion) and **File as a document** on an
@@ -4291,7 +4488,7 @@ Every requirement in the FORGE II document, with its status and phase:
    solicitation on the opportunity through `fileInboundAttachments`
    (new `index` argument) and queues `solicitation_parse`; the same
    file is not filed twice; audit `opportunity.correspondence.filed`.
-   Known limits: a reply filed before this PR keeps its header-only
+   Known limits: a reply filed before #508 keeps its header-only
    type (no re-read button); the model is asked once, with no retry.
 
    **6d-1 shipped** (#509, migration 0180; design §2.5 Answering).
@@ -4328,7 +4525,7 @@ Every requirement in the FORGE II document, with its status and phase:
    custom headers are confirmed from the installed SDK's types only
    and not yet by a real send.
 
-   **6d-2 shipped** (this PR, no migration; design §2.6).
+   **6d-2 shipped** (#510, no migration; design §2.6).
    `/pipeline/deliver` shows two lists (`DeliverSection.tsx`, loaders
    in `src/lib/deliver-pipeline.ts`, rules `readySignoffLine` and
    `deliveredSummary` in `deliver-logic.ts`). **Ready to deliver:**
@@ -4350,7 +4547,7 @@ Every requirement in the FORGE II document, with its status and phase:
    per-person read tracking needs a table and its own PR); the
    list's sign-off line counts the colour teams only, the
    submission-pack tick and the export gate are checked on the
-   Deliver tab. Phase 6 is complete with this PR.
+   Deliver tab. Phase 6 is complete (#510).
 
 ---
 
@@ -4402,7 +4599,7 @@ Delivered:
 ---
 
 ### BL-NAV-PORTAL — Sign-in portal picker and platform-admin wall (reverted)
-**Priority:** P1  ·  **Effort:** XS  ·  **Status:** ↩️ reverted (PR #286 shipped 2026-09-29, reverted the same day at the user's request)
+**Priority:** P1  ·  **Effort:** XS  ·  **Status:** ↩️ reverted (PR #286 shipped 2026-09-29, reverted the same day by PR #287 at the user's request)
 
 PR #286 added a `/portal` picker after sign-in, showed the sign-in page
 at the site root, and walled a platform admin off tenant work. The
@@ -4604,7 +4801,7 @@ first; a federal / CUI customer in the pipeline).
   workspace goes only when asked, the purge takes exactly the previewed
   eligible accounts and their workspaces, audits).
 
-**Slice 2 — trials (queued; decisions 2026-10-04):** a public **Request
+**Slice 2 — trials (shipped: Slice 2a PR #320, Slice 2b PR #321; decisions 2026-10-04):** a public **Request
 a trial** form (same name / honeypot / timing checks) into a
 platform-level `trial_request` queue.
 - **Who:** company email only — public mailboxes (Gmail, Outlook, Yahoo
@@ -4802,11 +4999,11 @@ Qualification), so the two never disagree. Every segment and the won /
 lost / no-bid figures open the dashboard filtered to that stage in the
 page's window. A **Lessons from lost bids** link opens loss intelligence.
 
-**Open with the owner:** the stage names. The reference funnel reads
+**Settled with the owner (2026-10-24):** the stage names. The reference funnel reads
 Identified · Evaluated · Qualified · Captured · Developed · Submitted ·
 Closed-Won · Archived; FORGE's are Identified · Sources sought ·
 Qualification · Capture · Pre-proposal · Writing · Submitted · Won (with
-Lost and No bid). Renaming is a schema and label change for a later PR.
+Lost and No bid). The rename shipped as BL-PIPE-STAGES (#420).
 
 ### BL-PIPE-STAGES — Stage names from the reference funnel
 **Priority:** P1  ·  **Effort:** S  ·  **Status:** ✅ shipped (#420)
@@ -4830,7 +5027,7 @@ funnel, the gate decision's next-stage order and the customer-history
 labels all read from the one list.
 
 ### BL-CAP-MATRIX — Capability matrix as a questionnaire
-**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** ✅ shipped — A (#422), B (#423), C (#424), and the Qualified list's coverage column (this PR); design approved (owner, 2026-10-25)
+**Priority:** P1  ·  **Effort:** M (three PRs)  ·  **Status:** ✅ shipped — A (#422), B (#423), C (#424), and the Qualified list's coverage column (#425); design approved (owner, 2026-10-25)
 
 **Phase A delivered:** table `opportunity_capability_matrix` (migration 0135; org-scoped, one row per opportunity, questions and answers as JSON with the parse version), the question builder (`capability_questions` AI feature, standing questions in `src/lib/capability-matrix-types.ts`, prompt in `capability-matrix-prompt.ts`), the panel on the Evaluation tab (build, rebuild with answers carried over, reword, remove, answer with evidence and a partner), audit rows `opportunity.capability_questions.{build,answer,edit,remove}`, tests for the question set, the carry-over and the parse version. Relation to BL-STAB-9b: the solicitation page's AI-scored matrix (one cell per requirement, `capability_matrix` feature) stays as is; phase C reads its cells as suggested answers.
 
@@ -4909,11 +5106,11 @@ re-parse offers a rebuild without losing answers to unchanged questions.
 **Owner decisions (2026-10-25), all as proposed:** the six-option answer
 scale; teaming flagged under 70% coverage of `shall` requirements; the
 PWin factor up to ±1.0 log-odds; any member on the opportunity may
-answer (the same rule as the bid / no-bid scores). Phase A starts once
-this design PR merges.
+answer (the same rule as the bid / no-bid scores). Phase A started once
+the design PR (#421) merged.
 
 ### BL-COMPANY-MODEL — FORGE's account of the company, approved by a person
-**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design (#426), 1a (#427), 1b (#428), 1c readers (this PR); design approved as proposed (#426 merged 2026-10-26: admins approve, the listed staleness triggers, the scout switches first, keywords proposed into Settings)
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design (#426), 1a (#427), 1b (#428), 1c readers (#429); design approved as proposed (#426 merged 2026-10-26: admins approve, the listed staleness triggers, the scout switches first, keywords proposed into Settings)
 
 **Phase 1a delivered:** tables `organization_model` (one row per org: the draft with its sources, model and prompt version; the approved body with its version, approver and time; `stale_reasons` for 1b) and `organization_model_version` (migration 0137); `src/lib/company-model.ts` (the body schema shared by the AI answer and a person's edit, the acceptance pass that keeps only evidence the build showed and downgrades "proven" without it, the edit sanitiser, the section-change count); `company-model-prompt.ts` and `company-model-inputs.ts` (profile, up to 40 capability / past-performance / personnel entries with the capability statement first, the last 20 decided bids with loss reasons, up to 200 confirmed questionnaire answers; every evidence id labelled); the `company_model` AI feature; actions build / save draft / approve / discard (org admins; audit `organization.model.{build,edit,approve,discard}`); the Settings → Company model page with the draft editor beside the approved version, in both sidebar trees; tests for the acceptance pass, the sanitiser and the prompt.
 
@@ -5012,7 +5209,7 @@ model exists.
    (proposed), or merged into the scout profile on approval.
 
 ### BL-LESSONS-LOOP — Lessons from every outcome, read back by the next bid
-**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design (#430), 4a (#431), 4b (#432), 4c the loop (this PR)
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design (#430), 4a (#431), 4b (#432), 4c the loop (#433)
 
 **Phase 4a delivered:** tables `opportunity_lesson` and `opportunity_lesson_application` (migration 0138); `src/lib/lessons.ts` (kinds, sources, statuses, the draft schema, the acceptance pass that keeps only shown evidence, drops repeats and pins an unscoped lesson to the bid's agency and NAICS, the edit sanitiser and the matching rule `lessonsMatching` for 4b); `lessons-prompt.ts` and `lessons-draft.ts` (`draftLessonsForProposal`: outcome, debrief, the proposal's winner analyses, unresolved review comments, the top loss patterns and the lessons already recorded; feature `lessons_extract`; `listLessons`); the hooks in `saveOutcomeAction` (a newly recorded won or lost outcome) and `saveDebriefAction` (a debrief just marked held), best-effort; actions draft / create / confirm / update / retire (Capture and Admin confirm; audit `opportunity.lesson.{draft,create,confirm,edit,retire}`); `LessonsList` on the Outcome tab and the new Platform Intelligence → Lessons page, in the sidebar; tests for the acceptance pass, the matching rule, the sanitiser and the prompt.
 
@@ -5094,10 +5291,10 @@ when proposed lessons wait for confirmation.
 **Owner decisions (2026-10-27), all as proposed:** Capture and Admin
 roles confirm a lesson; FORGE drafts them on outcome recorded and on
 debrief closed; the drafter reads them first; retired lessons are kept
-and shown greyed. Phase 4a starts once this design PR merges.
+and shown greyed. Phase 4a started once the design PR (#430) merged.
 
 ### BL-NEXT-ACTION — FORGE proposes the next action, and prepares it, for a person to approve
-**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design approved as proposed (#434); 5a the rules and the record (#435); 5b the organisation view (#436); 5c preparing ahead (this PR)
+**Priority:** P1  ·  **Effort:** L (three PRs)  ·  **Status:** ✅ shipped — design approved as proposed (#434); 5a the rules and the record (#435); 5b the organisation view (#436); 5c preparing ahead (#437)
 
 **Phase 5a delivered:** table `opportunity_next_action` (migration 0139; org-scoped, one open row per opportunity and kind, with the rule, the evidence, the priority, the due-by, the stage when proposed, the status and who decided); `src/lib/next-actions.ts` (pure: the twenty-one rules of the design's table, one per kind, each with `holds` and `done`; the due-date escalation; `rankActions`; `reconcileNextActions`, which refreshes open rows, closes them as done or superseded from the state, honours a 14-day dismissal at the same stage and never opens two rows of one kind; `mayDecideNextAction`); `next-action-state.ts` (one pursuit's state in one scoped pass: solicitation parse status, evaluation, questionnaire coverage and partner call with waiting suggestions, brief, incumbent, the latest proposal's sections, caps, compliance mapping, reviews, open comments, scan, outcome and debrief, proposed lessons); `next-action-sync.ts` (`syncNextActions` on page open and `refreshNextActions` in the brain-index cron, bounded to 300 pursuits; `decideNextAction`); the **Next action** panel on the opportunity and proposal overviews with Go, Done and Not now; audit rows `opportunity.next_action.{propose,done,dismiss}`; tests per stage, for the at-risk rule, the escalation, the reconciliation and the permission.
 
@@ -5252,7 +5449,7 @@ also leaves the section's own audit row as today.
    the deadline rules.)
 
 ### BL-VISION-AUTOPILOT — FORGE learns the business and owns more of the lifecycle
-**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phases 1 (BL-COMPANY-MODEL, #426–#429), 3 (BL-CAP-MATRIX, #422–#425) and 4 (BL-LESSONS-LOOP, #430–#433) shipped; phase 5 shipped as BL-NEXT-ACTION (design #434, 5a #435, 5b #436, 5c this PR); phase 2 (keywords and more sources) to be sized with the owner
+**Priority:** P1  ·  **Effort:** XL  ·  **Status:** 🔄 phases 1 (BL-COMPANY-MODEL, #426–#429), 3 (BL-CAP-MATRIX, #422–#425) and 4 (BL-LESSONS-LOOP, #430–#433) shipped; phase 5 shipped as BL-NEXT-ACTION (design #434, 5a #435, 5b #436, 5c #437); phase 2 (keywords and more sources) partly delivered: keywords adopted from the company model (#429), one Scout page (#458, #459), the bid inbox (#460 to #462), capability fit (#492); connectors to other portals remain under BL-SCOUT-PORTALS, to be sized with the owner
 
 Owner vision (2026-10-24): FORGE learns each subscribed customer's
 business model, capabilities, NAICS codes and what they actually do under
@@ -5301,7 +5498,7 @@ proposal's chances. Over time FORGE owns the proposal lifecycle.
   person's approval (phase 5).
 
 ### BL-UI-UNIFORM — One accent, readable ink, no leftover chrome
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped: A, B, C1–C10, D, the manuals and the Command Center pass (#400–#417), C11 tables (#481), C12 (#482, this PR)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped: A, B, C1–C10, D, the manuals and the Command Center pass (#400–#417), C11 tables (#481), C12 (#482)
 
 Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
 
@@ -5317,7 +5514,7 @@ Follow-up to BL-UI-ENABLENOW after a both-theme sweep of every page.
   palette) and a test fails on any undefined family/stop or `[#hex]`
   colour class.
 
-**Review follow-ups (this PR):** impersonation banner uses a light red tint
+**Review follow-ups (#401):** impersonation banner uses a light red tint
 with `text-text`/`text-muted`; exported diagram SVGs take fixed print
 colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 `bg-black/N`, `bg-[#hex]` and `text-muted/N`.
@@ -5326,33 +5523,33 @@ colours from `PRINT_HEX`; a test bans `text-foreground`, `var(--text)`,
 
 **C1 (shipped, #403; compliance category chips were missed there and fixed in C2):** owner answers 2026-10-22 — colour-team and stage tags become an ink `aur-tag` with a team diamond (`ColorTeamTag`); the default-template marker uses the accent; compliance category and evidence-kind chips are neutral ink. 
 
-**C2 (this PR):** compliance category and knowledge-kind and company-relationship chips are neutral `aur-tag`s; key dates colour by proximity (past muted, within 7 days brass, else ink) with a neutral type tag; the workflow strip is ink labels with a diamond on the current stage. Still in C: sidebar, tabs, hairline stat tiles and list rows, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
+**C2 (#404):** compliance category and knowledge-kind and company-relationship chips are neutral `aur-tag`s; key dates colour by proximity (past muted, within 7 days brass, else ink) with a neutral type tag; the workflow strip is ink labels with a diamond on the current stage. Still in C: sidebar, tabs, hairline stat tiles and list rows, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
 
-**C3 (this PR):** tabs become sans text with the diamond on the current and hovered tab (`.aur-tab`, six sites); page-header meta tiles and `StatTile` become ink figures on a hairline (only error counts keep a hue). Still in C: sidebar group labels, list rows on hairlines, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
+**C3 (#405):** tabs become sans text with the diamond on the current and hovered tab (`.aur-tab`, six sites); page-header meta tiles and `StatTile` become ink figures on a hairline (only error counts keep a hue). Still in C: sidebar group labels, list rows on hairlines, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
 
-**C4 (this PR):** sidebar group heads are mono labels with a bare +/−, the icon tiles stay only on the collapsed rail, and the current item carries the diamond in a fixed gutter so labels do not shift. Still in C: list rows on hairlines, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
+**C4 (#406):** sidebar group heads are mono labels with a bare +/−, the icon tiles stay only on the collapsed rail, and the current item carries the diamond in a fixed gutter so labels do not shift. Still in C: list rows on hairlines, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
 
-**C5 (this PR):** the opportunities, proposals and solicitations list rows sit on hairlines (`divide-y`, hover wash) instead of boxed rows. Other boxed rows (43 uses of the `rounded-lg border bg-layer/[0.02]` row) follow with the next slices. Still in C: those rows, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
+**C5 (#407):** the opportunities, proposals and solicitations list rows sit on hairlines (`divide-y`, hover wash) instead of boxed rows. Other boxed rows (43 uses of the `rounded-lg border bg-layer/[0.02]` row) follow with the next slices. Still in C: those rows, mono paragraphs to sans, secondary actions as links, one small button size, one table style.
 
-**C6 (this PR):** helper, notice and empty-state paragraphs (69 `<p>` with six or more words of text) move from mono 10/11px to body 13px. Labels, numbers and identifiers stay mono. Still in C: remaining boxed rows, secondary actions as links, one small button size, one table style.
+**C6 (#408):** helper, notice and empty-state paragraphs (69 `<p>` with six or more words of text) move from mono 10/11px to body 13px. Labels, numbers and identifiers stay mono. Still in C: remaining boxed rows, secondary actions as links, one small button size, one table style.
 
-**C7 (this PR):** visual check of C1 to C6 in both themes (home, proposals, reviews, compliance, company, admin). One fix: the first tab's label sat 26px inside the page edge; it now lines up.
+**C7 (#409):** visual check of C1 to C6 in both themes (home, proposals, reviews, compliance, company, admin). One fix: the first tab's label sat 26px inside the page edge; it now lines up.
 
-**D (this PR):** the transactional emails (shared shell, invite, reset, verify, review, notification and digest builders, billing dunning) move from the old navy palette to EnableNow's light look: white card on slate-25, ink and slate text, brand-blue button with 3px corners, no gradient stripe. Colours come from one `EMAIL_HEX` table in `theme-colors.ts` (email clients cannot read CSS variables). Still open: the rest of C (boxed rows, secondary actions as links, one button size, one table style).
+**D (#410):** the transactional emails (shared shell, invite, reset, verify, review, notification and digest builders, billing dunning) move from the old navy palette to EnableNow's light look: white card on slate-25, ink and slate text, brand-blue button with 3px corners, no gradient stripe. Colours come from one `EMAIL_HEX` table in `theme-colors.ts` (email clients cannot read CSS variables). Still open: the rest of C (boxed rows, secondary actions as links, one button size, one table style).
 
-**C8 (this PR):** nine more boxed list rows move to hairlines (agency contacts, trial requests, add-on catalog, scout, the review checklist, consolidated report and summary panels, customer history, Q&A). Still open in C: the boxed rows that are not simple lists (form panels, label rows, cards in a grid), secondary actions as links, one button size, one table style.
+**C8 (#411):** nine more boxed list rows move to hairlines (agency contacts, trial requests, add-on catalog, scout, the review checklist, consolidated report and summary panels, customer history, Q&A). Still open in C: the boxed rows that are not simple lists (form panels, label rows, cards in a grid), secondary actions as links, one button size, one table style.
 
-**C9 (this PR):** back and breadcrumb actions ("Back", "← …", 50 links, including the ghost-button ones) become text links with a new `.aur-link` class. Still open in C: other secondary actions ("Cancel", "Open", "Activity →"), one small button size, one table style, and the boxed rows that are not simple lists.
+**C9 (#412):** back and breadcrumb actions ("Back", "← …", 50 links, including the ghost-button ones) become text links with a new `.aur-link` class. Still open in C: other secondary actions ("Cancel", "Open", "Activity →"), one small button size, one table style, and the boxed rows that are not simple lists.
 
-**C10 (this PR):** one table style, `.aur-table` (open hairline rows, mono column heads): the notification rules and audit log tables drop their boxed wrapper and faint rules, the help manuals drop the full cell grid, and the reports tables adopt the class. Still open in C: the other ~20 hand-styled tables, other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
+**C10 (#413):** one table style, `.aur-table` (open hairline rows, mono column heads): the notification rules and audit log tables drop their boxed wrapper and faint rules, the help manuals drop the full cell grid, and the reports tables adopt the class. Still open in C: the other ~20 hand-styled tables, other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
 
-**C11 (this PR):** the remaining 27 hand-styled tables in 23 files move onto `.aur-table`: the admin gold set (documents and accuracy runs), tenant API tokens, SAM.gov keys, SBA 8(a) coverage and import runs, usage (tenants, AI features, model classes), contacts import preview, section signals, losses by competitor, the partner Compare page, the platform audit log, the compliance matrix, review section coverage, voices (authors and the side-by-side), AI engine (routing, golden and retrieval evals), API tokens and endpoints, Section L volumes, the solicitation diff, and the two printable reports (partner questionnaire, analysis). Each drops its boxed wrapper, faint rules, per-cell padding and ad-hoc head styling; numerals sit in mono 12px with tabular figures; status tones, the Compare page's closes/named cobalt and cell washes, the diff's red/green, sticky columns and the dense panels' gutters stay. Still open in C: other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
+**C11 (#481):** the remaining 27 hand-styled tables in 23 files move onto `.aur-table`: the admin gold set (documents and accuracy runs), tenant API tokens, SAM.gov keys, SBA 8(a) coverage and import runs, usage (tenants, AI features, model classes), contacts import preview, section signals, losses by competitor, the partner Compare page, the platform audit log, the compliance matrix, review section coverage, voices (authors and the side-by-side), AI engine (routing, golden and retrieval evals), API tokens and endpoints, Section L volumes, the solicitation diff, and the two printable reports (partner questionnaire, analysis). Each drops its boxed wrapper, faint rules, per-cell padding and ad-hoc head styling; numerals sit in mono 12px with tabular figures; status tones, the Compare page's closes/named cobalt and cell washes, the diff's red/green, sticky columns and the dense panels' gutters stay. Still open in C: other secondary actions ("Cancel", "Open"), one small button size, and the boxed rows that are not simple lists.
 
-**C12 (this PR):** the last of C, in three parts. (1) Secondary actions as links: the action beside a primary that only steps back (Cancel, Close, Dismiss, Done, Discard, Back, Open / View opportunity) moves from a ghost or light button to `.aur-link` at 50 sites in 39 files, as C9 did for Back: the inline-edit and confirm forms (Security, member security, competitors, lessons, win themes, gold set, trial requests, add-ons, error notes, impersonation, source requests, tags, compliance), the Send-for-review and Auto-draft dialog footers, the Companies / Proposals / Notification-rule page headers, the AI panel's mono-caps Close / Back to draft / Discard comparison, the command palette's Open Knowledge / Ask another, the per-row Open on Reviews and Contacts, and the auth pages' Go to sign in / Sign in; `.aur-link` gains a disabled state. Toggles that read "Cancel" only while open, decisions ("Not for us"), state changes, destructive cancels, the upload queue's row set and the icon ✕ closes stay buttons. (2) One button scale: there was no small button class; the "small size" was an inline `text-[10px]`/`[11px]`/`[12px]`/`text-xs` (and a `py-2`) on 371 button lines in 150 files plus `SendForReviewButton`'s `size="sm"`; all of it drops so every `.aur-btn*` sits on the one 14px scale, and the design system now says so. (3) Boxed rows onto hairlines: 74 files; the rows inside a panel that carry controls (members and invites, reviewers, evidence and auto-map suggestions, competitors, win themes, snapshots and tracked changes, document and upload staging rows, versions, add-on grants, tenant users, trial requests, gold-set items), the accordion rows (solicitation review sections, proposal sections, protest grounds, source-request triage), the checkbox and toggle rows (settings designations, tier feature flags, start-review reviewers, cite-sources, bootstrap), the sub-forms (add teammate, add competitor, voice sample, trial controls, wire invoice, save search, member reset, import search options, the three tier fieldsets, the dashed add-section and add-comment forms) and the ~37 plain boxed list rows the earlier passes missed all become `border-t border-layer/10` rows with no radius, wash or side padding, parents lose the gap between rows, and a row's selected / error state keeps its colour on the top line. Stat tiles, chips, inputs, code and notice blocks, menus, dialogs, the editor side panels and the page's main panels stay as they are.
+**C12 (#482):** the last of C, in three parts. (1) Secondary actions as links: the action beside a primary that only steps back (Cancel, Close, Dismiss, Done, Discard, Back, Open / View opportunity) moves from a ghost or light button to `.aur-link` at 50 sites in 39 files, as C9 did for Back: the inline-edit and confirm forms (Security, member security, competitors, lessons, win themes, gold set, trial requests, add-ons, error notes, impersonation, source requests, tags, compliance), the Send-for-review and Auto-draft dialog footers, the Companies / Proposals / Notification-rule page headers, the AI panel's mono-caps Close / Back to draft / Discard comparison, the command palette's Open Knowledge / Ask another, the per-row Open on Reviews and Contacts, and the auth pages' Go to sign in / Sign in; `.aur-link` gains a disabled state. Toggles that read "Cancel" only while open, decisions ("Not for us"), state changes, destructive cancels, the upload queue's row set and the icon ✕ closes stay buttons. (2) One button scale: there was no small button class; the "small size" was an inline `text-[10px]`/`[11px]`/`[12px]`/`text-xs` (and a `py-2`) on 371 button lines in 150 files plus `SendForReviewButton`'s `size="sm"`; all of it drops so every `.aur-btn*` sits on the one 14px scale, and the design system now says so. (3) Boxed rows onto hairlines: 74 files; the rows inside a panel that carry controls (members and invites, reviewers, evidence and auto-map suggestions, competitors, win themes, snapshots and tracked changes, document and upload staging rows, versions, add-on grants, tenant users, trial requests, gold-set items), the accordion rows (solicitation review sections, proposal sections, protest grounds, source-request triage), the checkbox and toggle rows (settings designations, tier feature flags, start-review reviewers, cite-sources, bootstrap), the sub-forms (add teammate, add competitor, voice sample, trial controls, wire invoice, save search, member reset, import search options, the three tier fieldsets, the dashed add-section and add-comment forms) and the ~37 plain boxed list rows the earlier passes missed all become `border-t border-layer/10` rows with no radius, wash or side padding, parents lose the gap between rows, and a row's selected / error state keeps its colour on the top line. Stat tiles, chips, inputs, code and notice blocks, menus, dialogs, the editor side panels and the page's main panels stay as they are.
 
-**Manuals (this PR):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
+**Manuals (merged with #416):** `docs/USER_MANUAL.md` (§2.0 Look and feel, What's new, sign-in notes, templates, compliance category) and `docs/ADMIN_MANUAL.md` (§1, §4, §7.1.1) now describe everything shipped in this item, and AGENTS.md convention 12 requires the manuals to change in the same PR as any user-visible change.
 
-**UX pass, Command Center (this PR):** Won, Lost, No bid and Submitted tiles no longer show a red "past due" (those stages are past the response date by definition; `buildStageStats` skips them, with a test); header figures are no longer zero-padded ("6", not "06") on every page; the Proposal stages, Recent proposals and Quick links panels use hairline rows.
+**UX pass, Command Center (#417):** Won, Lost, No bid and Submitted tiles no longer show a red "past due" (those stages are past the response date by definition; `buildStageStats` skips them, with a test); header figures are no longer zero-padded ("6", not "06") on every page; the Proposal stages, Recent proposals and Quick links panels use hairline rows.
 
 **Next (serial):** none: C12 was the last of C and the item is complete. Any later drift (a hand-styled table, a boxed row, a `text-[11px]` button, a Cancel styled as a button) is a one-line fix under the design-system rules, not a new phase.
 
@@ -5417,7 +5614,7 @@ the dark block, no white-alpha utility anywhere in `src`).
 ---
 
 ### BL-PACKAGES — Subscription packages + AI token caps
-**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ✅ add-ons Slice 1a shipped (PR #317)  ·  ✅ add-ons Slice 1b shipped (PR #318)
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** ✅ Slices 1–4 shipped (PRs #212, #213, #214, #215; runtime tests PR #235; checkout + portal via BL-17 #220–#222)  ·  ✅ add-ons Slice 1a shipped (PR #317)  ·  ✅ add-ons Slice 1b shipped (PR #318)  ·  ✅ add-ons Slice 2a (PR #324), 2b (PR #325), 2c Reports (PR #326)
 
 Super-admin-configurable subscription packages with à la carte add-ons. Schema for `subscription_tier`, `tenant_subscription`, `tenant_usage_counter` already in place from prior work.
 
@@ -6663,7 +6860,7 @@ through the row list.
 | Proposals In-flight / Submitted tabs | Merged #97 |
 | Help → FAQ page | Merged #98 |
 | Nav rebuild — 6-item structure | Merged #99 |
-| Proposal launcher (queue ingest + manual chain) | Open #100 |
+| Proposal launcher (queue ingest + manual chain) | Merged #100 |
 
 ---
 
@@ -6838,7 +7035,7 @@ include an Add Source option" ask in the original spec.
 
 Both pages already shared `getOrganizationSnapshot()` and the
 Command Center had the stage-grid mirror via `CommandCenterStageGrid`
-shipped in earlier work. This PR closes the audit gaps the spec
+shipped in earlier work. PR #141 closed the audit gaps the spec
 called for.
 
 **Already in place (foundation):**
@@ -6900,7 +7097,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c operator-pending; Slice 6 queued
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c ⏳ operator deploy (the collaboration server and the flag), engineering complete; Slice 6 ⏸ gated (2026-10-04: the move to AWS and a federal / CUI customer)
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -6962,7 +7159,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
   `@user` mentions, in-app notifications, optional `extension-redis`
   for horizontal Hocuspocus scale. ✅ *shipped (PR #227)*
 - **Slice 5** — Suggestion mode + version snapshots + diff viewer.
-  - **Slice 5a — Suggestion mode** (in-flight): the `TrackChanges`
+  - **Slice 5a — Suggestion mode** (shipped, PR #236): the `TrackChanges`
     extension grows a third state alongside `trackingEnabled`:
     `editorMode: "edit" | "suggest" | "view"`. `view` makes the
     editor read-only via `editor.setEditable(false)`; `suggest` is
@@ -6978,7 +7175,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     section's assigned `authorUserId` (ownerless sections fall
     back to owner-mode for the current user to avoid locking out
     single-author drafts).
-  - **Slice 5b — Version snapshots** (in-flight): new
+  - **Slice 5b — Version snapshots** (shipped, PR #237): new
     `proposal_section_snapshot` table (org-scoped) holding a
     point-in-time copy of `body_doc`, the word count, the author's
     name (denormalized so deleted users still attribute correctly),
@@ -6991,7 +7188,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     with restore + delete buttons (owner-only); non-owners see the
     list read-only. Each create / restore / delete writes an audit
     row.
-  - **Slice 5c — Diff viewer** (in-flight): each snapshot row in
+  - **Slice 5c — Diff viewer** (shipped, PR #238): each snapshot row in
     the sidebar grows a "Diff" button that opens a modal comparing
     that snapshot's projected plain text against the section's
     current body. Diffing happens client-side with `jsdiff`'s
@@ -7653,6 +7850,7 @@ notification delivered; SLA breach escalates to PM if not acknowledged.
 ---
 
 ### BL-14 — Settings page route split ✅ SHIPPED
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #124; the `/users` consolidation PR #123)
 
 PR #99 deep-linked Settings tabs via `?tab=integrations`. The spec
 asks them to be separate menu items; they're treated as such, but
@@ -7683,7 +7881,7 @@ back/forward works; deep-linking via `?tab=` no longer needed.
 > hides + route gates + database row-level filters.
 
 ### BL-15 — Tenant Administration
-**Priority:** P0  ·  **Effort:** L (phased)  ·  **Depends on:** BL-12 (uses audit log)
+**Priority:** P0  ·  **Effort:** L (phased)  ·  **Depends on:** BL-12 (uses audit log)  ·  **Status:** ✅ shipped (Phase A PR #159 · B-1 export PR #165 · B-2 transfer ownership PR #179 · B-3a activity and per-tenant users PR #199 · B-3b assume-identity PR #229, tests PR #233 · B-3c isolation check PR #239, tests PR #241). Not built: the async full-snapshot export, noted as future work
 
 Per spec: "this is where the customer accounts are managed."
 
@@ -7893,7 +8091,7 @@ audit log.
 ---
 
 ### BL-16 — Platform Configuration (tier model)
-**Priority:** P1  ·  **Effort:** L (phased)  ·  **Depends on:** BL-15
+**Priority:** P1  ·  **Effort:** L (phased)  ·  **Depends on:** BL-15  ·  **Status:** ✅ shipped (A PR #168 · B-1 to B-3c PR #169 to #173 · B-3d PR #225 · C-1 to C-4 PR #174 to #176, #178 · tests PR #231 · first-tier fix PR #282 · apiAccess PR #322 · customTemplates PR #323 · API Slice 2a PR #333 · 2b PR #334)  ·  ⏸ API Slice 2c, outbound webhooks, parked (owner, 2026-10-04: BL-AIX first). Not built: redeeming FORGE's own promo codes (Checkout takes Stripe's), API write endpoints
 
 Per spec: "tailor offerings with promotions and various levels:
 Bronze, Silver, Gold, Platinum, Custom."
@@ -8008,7 +8206,7 @@ built or need design work):
   actions (winner analysis, AI section draft, compliance preflight).
   Counter increments on every attempt, including failed AI calls —
   simpler call pattern at the cost of slightly inflated counts on
-  network errors. Refund semantics queued if accuracy ever matters.
+  network errors. Refund semantics shipped in Phase B-3d (PR #225).
 - `proposalsPerMonth` bumped from `createProposalAction`.
 - Each gated action catches `QuotaExceededError` and surfaces the
   upgrade-prompt message via the existing `{ ok: false, error }`
@@ -8277,7 +8475,7 @@ Without `customTemplates`:
 **What ships in a later phase**: the actual redemption flow
 (applying a code to a `tenant_subscription` to discount the next
 period's price). Redemption pairs with **BL-17** billing
-integration; the code data model is in place for when that lands.
+integration; BL-17 has shipped; redemption is still not built (Checkout takes Stripe's promotion codes).
 
 **Acceptance (full ticket):** create Custom tier with
 `aiRequestsPerMonth=0` (treated as deny under Phase B semantics;
@@ -8287,7 +8485,7 @@ run any AI feature → upgrade to Gold → AI features work.
 ---
 
 ### BL-17 — Subscriptions module
-**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-16
+**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-16  ·  **Status:** ✅ Slices 1 to 5 shipped (ADR PR #218 · schema and webhooks PR #219 · Checkout PR #220 · portal, dunning and tier flip PR #221 · enterprise wire invoice PR #222 · webhook tests PR #234); the wire-invoice flow is paused pending launch readiness (2026-06-20). Trials came with BL-AUTH-ABUSE (PR #320, #321). Not built: the super-admin subscription list by tier, status and expiry
 
 Per spec: "currently active subscriptions, trials, subscription
 types, and expiring subscriptions."
@@ -8334,7 +8532,7 @@ Cross-tenant super-admin view of the BL-12 audit log.
 
 **Deferred (separate ticket):** The legacy `AuditLogTab` in
 `/admin` (synthesizes events from raw table activity via
-`getRecentAuditEvents`) is **not** removed by this PR. Different
+`getRecentAuditEvents`) was **not** removed by PR #138 (BL-18-cleanup removed it, PR #144). Different
 data model than the BL-12 `audit_log` table — the legacy tab shows
 derived events (`org_created`, `proposal_updated`) timestamped from
 the originating table's `createdAt`, while the new view shows
@@ -8375,6 +8573,7 @@ the BL-18 view; no regression in the tenants page.
 ## Cross-cutting / foundation
 
 ### BL-19 — Multi-tenant isolation continuous verification
+**Priority:** P0  ·  **Effort:** S (Phase 1) + M (Phase 2)  ·  **Status:** ✅ shipped (Phase 1, the static check, PR #134; Phase 2, runtime tests and the CI job, PR #230; gates widened by the BL-TENANT-AUDIT re-run, PR #261)
 
 **Phase 1: static analyzer ✅ SHIPPED**
 
@@ -8530,7 +8729,7 @@ status checks in Settings → Branches → main.
 ---
 
 ### BL-QC-neon — Neon branch per PR — **shipped (workflow); operator setup pending**
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ workflow shipped; awaits operator config
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ workflow shipped (PR #149); awaits operator config (`NEON_API_KEY`, `NEON_PROJECT_ID`)
 
 **Shipped:**
 - New workflow `.github/workflows/neon-branch.yml`:
@@ -8558,7 +8757,7 @@ status checks in Settings → Branches → main.
 - Add `Create Neon branch` + `Delete Neon branch` to required
   status checks in Settings → Branches → main
 
-**Future follow-up (BL-QC-neon-migration-rewire):** modify the
+**Follow-up (BL-QC-neon-migration-rewire, shipped, PR #163):** modify the
 existing `Fresh-DB migration verification` job in `pr.yml` to use
 the per-PR Neon branch when configured (falling back to the
 ephemeral Postgres service when not). That gives migrations a test
@@ -8569,7 +8768,7 @@ being live + verified working.
 **Acceptance:** ✅ Opening a PR creates a Neon branch (once
 configured); closing/merging deletes it; the connection string is
 posted as a PR comment. Vercel preview auto-uses the branch via the
-Neon integration. Migration-rewire deferred.
+Neon integration. Migration-rewire shipped (PR #163).
 
 ---
 
@@ -8602,7 +8801,7 @@ configured, giving the migration test real production schema shape.
 ---
 
 ### BL-QC-links — Internal link check + the `/onboarding` dead end — **shipped**
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263)
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263; follow-up PR #264)
 
 Reported as "many links in the side menu are not working". Root cause:
 `requireCurrentOrg()` (`src/lib/auth-helpers.ts`) redirects to
@@ -8807,7 +9006,7 @@ Investigations) in **Team Settings → Agent**. Repurpose the in-repo
 footprint as an author-discipline checklist + remove machinery that
 only existed to handle agent-specific behavior.
 
-**Changes in this PR:**
+**Changes (PR #190):**
 - Move `.vercel/agent.md` → `docs/PRE_PUSH_CHECKLIST.md` and reframe
   as a self-review checklist (categories unchanged; intro/history
   updated)
@@ -8858,7 +9057,7 @@ repo that runs only against Vercel Agent activity.
 
 Wiring shipped in PR #193 but the user redirected to "skip Sentry and
 remove any reference" before the merge happened. The merge went
-through anyway by accident. Retired in BL-QC-sentry-retire (this PR).
+through anyway by accident. Retired in BL-QC-sentry-retire (PR #195).
 
 **Why retired:** the user's framing "Sentry is more like an audit log
 than anything else" matched our existing infrastructure exactly —
@@ -8870,7 +9069,7 @@ free tier is generous but Vercel-bundled Sentry was auto-reloading
 $25/mo via "Investigations" credit even before active use).
 
 **Replaced by:** `BL-QC-errors` — in-app `production_error` table +
-`/admin/errors` viewer (follow-up PR after this one lands).
+`/admin/errors` viewer (shipped, PR #196).
 
 ---
 
@@ -8880,7 +9079,7 @@ $25/mo via "Investigations" credit even before active use).
 Restores the cost-conscious posture established when Vercel Agent was
 retired (BL-QC-vercel-agent-retired). Sentry crept back in via PR #193
 which was merged after I marked it closed but before the close took
-effect. This PR cleanly removes every Sentry surface so future searches
+effect. PR #195 cleanly removed every Sentry surface so future searches
 of the codebase don't surface "is Sentry coming back?" ambiguity.
 
 **Removed:**
@@ -8993,7 +9192,7 @@ bug coming back is visible).
 BL-QC-errors landed the `production_error` table + admin viewer, but
 the 99 existing `log.error(...)` catch sites in the codebase still
 only wrote to Vercel logs — they didn't populate the new in-app
-viewer. This PR closes that gap with a minimal-touch wiring rather
+viewer. PR #198 closes that gap with a minimal-touch wiring rather
 than a 99-site sweep.
 
 **What ships:**
@@ -9051,7 +9250,7 @@ idempotent recovery SQL via the Neon SQL Editor. The 7 missing tables
 now exist on production. Audit log persistence works again,
 `/admin/orgs/[id]` renders, recordAudit succeeds.
 
-**This PR — SDLC closure:**
+**PR #202 — SDLC closure:**
 
 - New migration `drizzle/0052_repair_false_applied_ledger.sql` that
   idempotently re-creates the 7 missing tables. Mirrors the content
@@ -9081,11 +9280,11 @@ now exist on production. Audit log persistence works again,
   schema state by running migrations through the ledger
 
 **Acceptance:** ✅ The 7 tables exist on production. /admin and
-/admin/orgs/[id] load. After this PR merges + auto-migrate cold-starts,
+/admin/orgs/[id] load. After PR #202 merged + auto-migrate cold-starts,
 the ledger has 0052 applied. Fresh-DB CI passes (proves migration
 0052 is idempotent + composes with 0000-0051).
 
-**Hardening follow-up (queued, separate PR):**
+**Hardening follow-up (shipped: the drift detector PR #203; the Sync ledger button removed PR #204):**
 
 - BL-QC-ledger-drift-detector — detect "ledger says applied but
   target table missing" on boot. Auto-recover where safe, refuse to
@@ -9156,7 +9355,7 @@ not days.
 Final cleanup of the 2026-06-15 incident root cause. PR #203's
 hardening (`markMigrationsAppliedThrough` refuses to mark applied
 when target tables are missing) made the function safe, but the UI
-affordance was still confusing and easy to misuse. This PR removes
+affordance was still confusing and easy to misuse. PR #204 removes
 the UI entry point entirely.
 
 **Removed:**
@@ -9425,7 +9624,7 @@ tenant's surface.
 ---
 
 ### BL-21 — Help content refresh
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** rolling
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** rolling; last dedicated pass PR #331 (2026-10-04); queue empty; since then each feature PR updates the manuals itself (AGENTS.md convention 12)
 
 PR #98 added FAQ. User Guide (`/help/user`) and Admin Guide
 (`/help/admin`) markdown is updated as features ship.
@@ -9720,7 +9919,7 @@ matrix, winner analysis, AI scan, content generation, chat). Items
 are grouped by surface and given a stable **BL-FB-*** ID. Priorities
 reflect impact on **win rate** and **time saved per pursuit** — the
 two outcomes federal contractors actually measure. Final prioritization
-pending operator review.
+pending operator review. (2026-11-20: every item in this section has shipped, PR #245 to #330.)
 
 ### Area 1 — Solicitation intake ("RFP Command Center")
 
@@ -9754,7 +9953,7 @@ matrix. Persists Q&A history with timestamps; auto-flags the row in
 the matrix as "amended by Q&A".
 
 ### BL-FB-SOL-CALENDAR — Key-date calendar with reminders
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
 Auto-extract every key milestone from the solicitation (Q&A cutoff,
 site visit, final RFP, proposal due, oral presentation, expected award,
@@ -9847,7 +10046,7 @@ the questions a procurement attorney would ask, and the deadline math
 email. Recorded on the debrief row.
 
 ### BL-FB-WIN-PROTEST — Protest viability check
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #257)
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #255)
 
 Given the debrief weaknesses + the awardee's USAspending profile +
 the solicitation's evaluation criteria, surface "is there a credible
@@ -9952,7 +10151,7 @@ into a single proposal-level scan every N minutes. Foundation for
 all downstream scan enhancements (themes, contradiction, tone).
 
 ### BL-FB-SCAN-THEMES — Win-theme consistency check
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #256)
 
 Set 3 win themes upfront on the proposal (e.g. "FedRAMP High depth,"
 "lowest-risk transition," "DEI in workforce"). The scan checks every
@@ -9960,7 +10159,7 @@ section reinforces them; flags sections that drift off-theme.
 Surfaces theme coverage as a per-section badge.
 
 ### BL-FB-SCAN-CONTRADICTION — Cross-volume contradiction detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
 Detect inconsistencies between volumes — e.g., Technical Volume claims
 24/7 operations, Management Volume staffs only business hours.
@@ -10178,7 +10377,7 @@ direct path to "less generic content" (the issue #6 we already
 addressed) becoming "deeply specific, on-brand content."
 
 ### BL-FB-X-PWIN-MODEL — Calibrated PWin model
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258)
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258; nightly snapshots PR #291; capability factor PR #423). The trained model waits on about 100 decided outcomes per organization
 
 Train a model on your historical outcomes (NAICS × agency × set-aside
 × incumbent × company size × proposal stage × time-in-stage) to
@@ -10489,6 +10688,11 @@ the scan already sits in the `strong` routing class. Watch
 
 ## Effort summary
 
+> **History (as planned 2026-05-04).** All 23 original items have shipped
+> (PR #102 to #334), except BL-9 Slice 2c (operator deploy) and Slice 6
+> (gated); BL-21 is continuous. For the current state see "State of the
+> backlog" at the top.
+
 | Category | Items | Total effort |
 |---|---|---|
 | Cleanup / debt | BL-1, BL-2 (shipped) | ~1 day |
@@ -10503,11 +10707,15 @@ the scan already sits in the `strong` routing class. Watch
 
 ## Recommended execution order
 
+> **History (as planned 2026-05-04).** Items 1 to 20 below have shipped;
+> of BL-9 only Slices 2c and 6 remain. What comes next is under "Next"
+> in "State of the backlog" at the top.
+
 Strict P0 / P1 / P2 ordering, with parallelism where dependencies allow:
 
 1. ~~**BL-1, BL-2**~~ — placeholder debt closed (PR #102)
 2. ~~**BL-22**~~ — nav v2 visual refresh (PR #103)
-3. **BL-3** — small, ships visible polish (stage widgets) ← **next**
+3. **BL-3** — small, ships visible polish (stage widgets)
 4. **BL-7** — tied to BL-3; wire the same widgets to Command Center
 5. **BL-4** — pipeline funnel (visible win)
 6. **BL-5** — GSA paste (mirrors existing eBuy paste; well-trodden)
@@ -10527,8 +10735,9 @@ Strict P0 / P1 / P2 ordering, with parallelism where dependencies allow:
 19. **BL-20** — Auth decision logging
 20. **BL-11** — Brain self-improvement loop
 21. **BL-9 (XL)** — Word-level collab editor (the big one)
-19. **BL-21** — Help content refresh (continuous)
+22. **BL-21** — Help content refresh (continuous)
 
 This document is the single source of truth for backlog items.
 Update it in the same PR that ships an item — mark status, link the
-PR number, note any scope changes.
+PR number, note any scope changes, and update "State of the backlog"
+at the top. Never write "this PR" in a status.
