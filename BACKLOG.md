@@ -8,7 +8,7 @@ This file replaces the per-branch `backlog1.md` … `backlog5.md` handoff notes.
 
 ## 1. Live state at a glance
 
-- **Repo:** `SYSUSA-INC/forge`
+- **Repo:** `SYSUSA-INC/FORGEAXI`
 - **Production:** https://www.sysgov.com (Vercel, auto-deploys `main`)
 - **DB:** Neon Postgres + pgvector, Drizzle ORM via `pg` Pool
 - **Auth:** NextAuth v5 (Credentials + Google + Microsoft + GitHub)

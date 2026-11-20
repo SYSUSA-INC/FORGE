@@ -104,7 +104,7 @@ DATABASE_URL='<new prod connection string>' node scripts/apply-schema.mjs
 
 The existing FORGE Vercel project becomes **prod**. We create a NEW one for staging.
 
-1. https://vercel.com → **New Project** → import sysusa-inc/forge
+1. https://vercel.com → **New Project** → import SYSUSA-INC/FORGEAXI
 2. Name: `forge-staging`
 3. Production branch: `main`
 4. Custom domain: `staging.forge.app` (set this up at the registrar first)

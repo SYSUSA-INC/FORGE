@@ -81,7 +81,7 @@ Re-enable:
 
 ## How to verify the current state matches this doc
 
-1. Navigate to `https://github.com/SYSUSA-INC/FORGE/settings/branches`
+1. Navigate to `https://github.com/SYSUSA-INC/FORGEAXI/settings/branches`
 2. Click `Edit` on the `main` rule
 3. Cross-reference each section above against the live rule UI
 4. If anything has drifted (added or removed a check, toggled a setting), update this file in the same PR that touches the rule. Drift between this doc and the live config means the doc has stopped being authoritative — and once that happens it stops being read.

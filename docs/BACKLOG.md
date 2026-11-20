@@ -2,7 +2,8 @@
 
 Comprehensive backlog of every capability captured from the platform
 spec discussions. Each item has a stable **BL-N** ID; PR numbers fill
-in as items ship. **Hard rule:** every BL ships complete and
+in as items ship. **Start with "State of the backlog" just below:** it
+says what is delivered, what is left and what waits on whom. **Hard rule:** every BL ships complete and
 production-ready (no scaffolding, no `Coming soon` stubs).
 
 Priority key:
@@ -19,7 +20,194 @@ Effort key:
 
 ---
 
-## Active priorities (2026-06-16)
+## State of the backlog
+
+**As of 2026-11-20, `main` at `f47a862`, through PR #513.** Checked
+against the merged pull requests and the code, not against the entries'
+own wording. If the date or the sha here is old, check `git log` before
+trusting a status below, and correct this section in the same PR.
+
+### The plan
+
+FORGE II (owner, 2026-11-01; `docs/FORGE_II_REQUIREMENTS.md`) makes the
+product follow the proposal lifecycle: **Identify → Evaluate → Capture →
+Plan → Develop → Deliver → Measure**. BL-NAV-LIFECYCLE builds it in
+phases 0 to 9: the menu (0), one phase per stage (1 to 7), the partner
+portal (8) and the pipeline's stage names (9). Beside it run four
+standing tracks: **BL-STAB** (problems the owner found in testing, P0),
+**BL-AIX** (the AI platform's next generation, parked behind BL-STAB),
+**Scout** (finding opportunities: the BL-SCOUT-* entries) and the
+**platform and quality gates** (BL-QC-*, tenancy, billing, sign-in).
+
+### Delivered
+
+| Track | What shipped | PRs |
+|---|---|---|
+| The original backlog, BL-1 to BL-23 | All of it, except the two BL-9 items under "Left" | #102 to #334 |
+| Quality gates, BL-QC-* | Every gate; BL-QC-neon lacks its operator configuration | #146 to #310 |
+| Tenancy and environments | BL-TENANT-AUDIT (v1 and the 2026-09 re-run), BL-TENANT-DRIFT, BL-ENV-SEP's code | #210, #211, #216, #261, #262, #266 |
+| Billing and plans | BL-17 Stripe, BL-PACKAGES and add-ons, BL-AUTH-ABUSE trials, the BL-16 API | #212 to #215, #218 to #222, #317 to #326, #333, #334 |
+| User feedback, BL-FB-* | All 35 items | #245 to #260, #296 to #316, #327 to #330 |
+| AI platform | BL-AI-* (#257), BL-AIP remediation, BL-AIX phases 0a to 2c-1 | #269 to #295, #335 to #358 |
+| BL-STAB | 1, 2, 4a, 6, 7, 9, 10 (except 10c), 11, 8a mandatory two-step sign-in, 8b email validation | #359 to #396, #399, #415, #416, #439 to #448, #450 |
+| The look | BL-UI-THEME, BL-UI-ENABLENOW, BL-UI-UNIFORM, BL-PIPE-DRILL, BL-PIPE-FUNNEL, BL-PIPE-STAGES | #272, #387, #398, #400 to #413, #417 to #420, #481, #482 |
+| BL-VISION-AUTOPILOT phases 1, 3, 4, 5 | BL-CAP-MATRIX, BL-COMPANY-MODEL, BL-LESSONS-LOOP, BL-NEXT-ACTION | #421 to #437 |
+| Scout | QUALITY, REACH, AMEND, ONEPAGE, INBOX phases 1 and 2, FILES, BACKFILL, FIT, LEARN, SHOWN | #455 to #462, #468, #475, #490 to #494 |
+| Sign-in and identity | BL-MFA-RECOVERY, BL-MFA-ADMIN, BL-OPP-SOURCE, BL-DOMAIN-FORGEAXI phases 1 and 2 | #464, #465, #467, #472 |
+| BL-NAV-LIFECYCLE phases 0 to 6 | The menu, Identify, Evaluate, Capture, Plan, Develop, Deliver (migrations 0150 to 0180) | #449, #452, #453, #463 to #510 |
+| Test fixes | `tests/isolation/milestones.test.ts` no longer depends on the hour or on midnight UTC | #511 to #513 |
+
+### Left: in progress or partly shipped
+
+| Entry | What remains | Waits on |
+|---|---|---|
+| BL-STAB-3 | New Solicitation takes several files at once, each classified and filed | Nothing; the owner's decisions are recorded (2026-10-21) |
+| BL-STAB-4b | Each amendment compared with the one before it | Nothing |
+| BL-STAB-5 | Contracting officer Q&A uploaded in the format it was released | Nothing |
+| BL-STAB-8c | A verified mobile phone | The number can be captured now; the text-message step waits on the owner choosing a provider |
+| BL-STAB-8d | Cloudflare in front of the platform | The code side waits on nothing; moving the nameservers is an operator step |
+| BL-STAB-10c | A reserve for the shared SAM.gov key | What the quota logs show |
+| BL-NAV-LIFECYCLE phase 7 | Measure: R-1 to R-3 | A design document for the owner's review; none exists (`docs/design/PHASE_7_AUTHORING_TEMPLATES_OUTPUT.md` is an older, different "Phase 7") |
+| BL-NAV-LIFECYCLE phase 8 | The partner portal: partner accounts, C-8 to C-10, P-6, D-4 for outside reviewers | A design document; none exists |
+| BL-NAV-LIFECYCLE phase 9 | Pipeline stages renamed to the seven stages (L-1) | Phases 7 and 8 |
+| BL-VISION-AUTOPILOT phase 2 | Sources beyond SAM.gov and email; keywords FORGE adopts by itself | The owner, through BL-SCOUT-PORTALS |
+| BL-SCOUT-INBOX phases 3 and 4 | The company's own domain; dedicated portal readers | 3: nothing. 4: the owner naming the portals and supplying sample alerts |
+| BL-9 Slice 2c | The collaboration server deployed and the flag turned on for a pilot company | Operator; the engineering is complete |
+| FORGE II rows not yet ✅ | I-6, L-1, L-3, E-12, E-14, C-2, C-11, P-6, D-4, D-6, R-1 to R-3 (🟡); D-8 (⚠️) | See each row in `docs/FORGE_II_REQUIREMENTS.md` |
+
+### Left: planned and not started
+
+| Entry | What it is | Waits on |
+|---|---|---|
+| BL-SCOUT-GWAC (I-7) | Task orders from the contract vehicles a company holds | The owner: which vehicles first, API or email, how a company records its vehicles |
+| FORGE II C-8, C-9, C-10 | Agreements, templates and e-signature with partners | Phase 8 |
+| FORGE II S-5 | Submission to a portal by FORGE | The owner recorded it for later |
+| FORGE II M-7 to M-11 | Five menu items | The owner has not placed them |
+
+### Left: parked, or waiting on the owner or an operator
+
+| Entry | What it is | Waits on |
+|---|---|---|
+| BL-AIX 2c-2 onward | Section L/M verdicts, learning from a company's corrections, structured Section C, the crosswalk, phases 3 to 6 | Owner, 2026-10-08: stabilization first |
+| BL-16 API Slice 2c | Outbound webhooks | Owner, 2026-10-04: parked |
+| BL-SCOUT-PORTALS | Connectors to commercial and state portals | The owner choosing the first connectors |
+| BL-9 Slice 6 | GovCloud | The move to AWS and a federal or CUI customer (2026-10-04) |
+| BL-17 Slice 5 | Enterprise wire invoices: built, paused | Launch readiness (2026-06-20) |
+| BL-ENV-SEP | Separate production and staging | Operator: `docs/ENVIRONMENTS.md` §10, steps 1 to 9 |
+| BL-QC-neon | A database branch per PR | Operator: `NEON_API_KEY`, `NEON_PROJECT_ID` |
+| BL-DOMAIN-FORGEAXI phase 3 | support@ and sales@ addresses on forgeaxi.com | The owner naming the addresses |
+| BL-TENANT-AUDIT | The quarterly re-run | Due 2026-12; many routes and tables were added since 2026-09 |
+| BL-21 | Help content refresh | Rolling; the queue is empty |
+
+### Open owner decisions
+
+Asked and not answered. A merge is not an answer.
+
+1. **The receipt upload:** also inside the Record submission form, or is
+   "Attach a receipt" afterwards enough?
+2. **Four choices made in phase 6c and never commented on:** every reply,
+   out-of-office notices included, emails up to three people; File as a
+   document is open to any member; each reply that is not automatic
+   spends one monthly AI request; replies filed before #508 keep their
+   header-only label.
+3. **The Delivered list's reply count:** keep "since your last message",
+   or build per-person read tracking (a new table, its own PR)?
+4. **What comes next:** see "Next" below.
+5. **Phase 5d:** is the computed style note enough, or is a summary
+   written by the model wanted as well?
+6. **BL-STAB-8c:** which text-message provider.
+7. **BL-SCOUT-PORTALS and BL-SCOUT-GWAC:** which connectors and which
+   vehicles first.
+8. **BL-AIX (2026-10-04):** CUI or ITAR companies within twelve months;
+   logging prompts and responses with consent; a provider key for an
+   accuracy job in CI.
+
+### Owner and operator steps outstanding
+
+None of these can be confirmed from the repository; each stays here
+until someone says it is done.
+
+- **Before a real send from Deliver:** verify the inbound subdomain
+  (`INBOUND_EMAIL_DOMAIN`, for example bids.forgeaxi.com) in Resend as a
+  sending domain. Until then every real send is refused.
+- **Migrations:** sync 0151 to 0180 on `/admin/migrations`, in order.
+- **Phase 6 has not been exercised for real.** Nothing in it has been
+  clicked through in a browser, no real email has been sent or received,
+  the `delivery_reply` prompt has never run against a real model, and
+  the reply headers (In-Reply-To, References) are confirmed from the
+  mail library's types only.
+- **Once by hand, with the `CRON_SECRET` bearer:** `/api/cron/style-notes`
+  and `/api/cron/partner-invites`.
+- **Before web research or search packs go live:** web search enabled
+  for the Anthropic organization in the Claude Console; `charge.refunded`
+  added to the Stripe webhook endpoint's events; the #500 checklist run
+  in Stripe test mode.
+- **`AWARDS_INTEL_ENABLED=1`** in Vercel, for partner search and the
+  agency history.
+- **The bid inbox:** the Exchange and Microsoft Graph setup in
+  `docs/ADMIN_MANUAL.md` §3.7.
+- **The Evaluate upload failure:** the bucket's CORS and a network check
+  (Admin → Jobs → File storage).
+- **Scout thresholds** (`src/lib/scout-fit.ts`, `scout-learn.ts`,
+  `scout-logic.ts`) are untuned defaults, awaiting one company's run
+  note.
+- **BL-STAB-8a rollout:** raise `auth.session_epoch` at release and set
+  `SIGNUP_MODE=invite_only` in production.
+- The operator rows in the table above: BL-ENV-SEP, BL-QC-neon, BL-9
+  Slice 2c, the BL-STAB-8d nameservers.
+
+### Phase 6 known limits
+
+True on `main` and not scheduled:
+
+- a send whose job dies with its instance three times stays "Sending…";
+- a retry by hand is a new row;
+- a receipt cannot be removed, and adding one is read-then-write;
+- filing a reply is not transactional;
+- inbound mail is not routed by In-Reply-To, and `routeReply` may tie a
+  later reply to an answer row;
+- replies filed before #508 are not re-read;
+- an answer does not quote the message it answers;
+- Pipeline → Deliver counts replies "since your last message", not per
+  person, and its sign-off line counts colour teams only.
+
+### Next
+
+**The order is not decided.** The owner has not chosen between:
+
+- **the remaining BL-STAB items** (3, 4b, 5, 8c, 8d), which this
+  backlog's own rule puts first: BL-STAB is P0, and "new development
+  waits until this list is done" (2026-10-08). In practice the Scout
+  work and BL-NAV-LIFECYCLE were built after BL-STAB-8b at the owner's
+  direction, so the rule no longer describes the order;
+- **phase 7, Measure**, which FORGE II's own order names next. It needs
+  a design document for the owner's review before any code.
+
+Also offered and not asked for: a one-line fix for the flaky
+`tests/isolation/partner-invite.test.ts:82`, as its own PR.
+
+### How to keep this current
+
+1. Every PR that ships backlog work updates **this section and its own
+   entry** in the same PR: move the row from "Left" to "Delivered", and
+   change the date, the sha and the PR number in the first line.
+2. **Never write "this PR"** in a status, nor "next PR", "in review" or
+   "in its own PR". They are stale the moment the PR merges. Write the
+   PR number once the PR is open, or "PR for `<branch>`" until then.
+3. Every `### BL-…` entry has a `**Status:**` line under its heading.
+4. A decision the owner has not answered stays under "Open owner
+   decisions" until the owner answers it in words.
+5. Shipped entries are kept, with their status corrected. Nothing is
+   deleted.
+
+---
+
+## Shipped log, 2026-06 to 2026-11
+
+The table that used to head this file as "Active priorities
+(2026-06-16)", kept as history with its statuses corrected on
+2026-11-20. It is not the list of what is active: that is the section
+above.
 
 | # | Item | Priority | Effort | Status |
 |---|---|---|---|---|
@@ -104,7 +292,7 @@ Effort key:
 | 3ba | **BL-STAB-5** — Contracting officer Q&A uploaded in the format it was released (Word, Excel, PDF, text), read into question/answer pairs, with suggestions for the response | P0 | M | ⏳ queued (BL-STAB-2 has shipped; not started) |
 | 3bb | **BL-AIX Phase 2c-2 onward** — L/M verdicts, per-tenant extraction learning, structured Section C, crosswalk, amendment propagation, SAM.gov attachments, Phases 3–6 | P0 | XL | ⏸ parked (owner, 2026-10-08: stabilization first, BL-STAB) |
 | 4 | **BL-9 Slice 2b** — SectionsClient wires collab editor | P1 | M | ✅ shipped (PR #217) |
-| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ queued (operator deploy) |
+| 5 | **BL-9 Slice 2c** — Deploy Hocuspocus to Fly + flip collab flag for pilot tenant | P1 | M | ⏳ operator deploy not done; the engineering is complete |
 | 6 | **BL-9 Slice 2d** — Server-side body_doc projection writeback (Yjs → ProseMirror JSON on store-debounce) | P2 | S | ✅ shipped (PR #224) |
 | 12 | **BL-9 Slice 3** — Y.Map-based track changes (TcInsert/TcDelete marks + sidebar + recording toggle) | P1 | M | ✅ shipped (PR #226) |
 | 13 | **BL-9 Slice 4** — Comment threads (commentAnchor mark + Y.Map threads + sidebar + reply/resolve flow) | P1 | M | ✅ shipped (PR #227) |
@@ -2846,6 +3034,7 @@ out to deliver; new AI work starts a new ticket.
 ---
 
 ### BL-SCOUT-QUALITY — Scout raises real finds, not every notice that names a keyword
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #455)
 
 **Owner, 2026-11-03:** two cards for one Marine Corps RFI (Amendments 03
 and 04), both "Scored · not triaged", fit 65 for a single mention of
@@ -2901,6 +3090,7 @@ Go / No-Go decision, a No-Go stops the watch.
 ---
 
 ### BL-SCOUT-AMEND — The amendment watch
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #457)
 
 **Owner, 2026-11-03:** "as the scout runs and finds amendments to any
 solicitation that we have decided to go on, it must automatically
@@ -2965,6 +3155,7 @@ and no-bid do (it moves the opportunity to No bid).
 ---
 
 ### BL-SCOUT-REACH — Scout reads every notice in the company's codes
+**Priority:** P0  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #456)
 
 **Owner, 2026-11-05:** "you telling me there are only 3 opportunities
 that meet our criteria out there on SAM.gov — our Scout seems to be
@@ -3028,6 +3219,7 @@ keep the exact filter. The owner chose (b).
 ---
 
 ### BL-SCOUT-BACKFILL — Scout reads everything open, not three days
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (the backfill PR #490; BL-SCOUT-FIT PR #492, design PR #491; BL-SCOUT-LEARN PR #493; BL-SCOUT-SHOWN PR #494)
 
 **Owner, 2026-11-10:** "It brings 3-5 opportunities when thousands are out
 there … people want to see opportunities relevant to their capabilities."
@@ -3106,6 +3298,7 @@ migration (still 0169). Tests: `tests/ai/scout-logic.test.ts`,
 ---
 
 ### BL-SCOUT-ONEPAGE — Scout as one page
+**Priority:** P0  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #458, the frame; PR #459, eBuy and GSA email rows)
 
 **Owner, 2026-11-06**, quoting FORGE II footnote 3: "a single page that
 combines Import from SAM, paste GSA email, paste from eBuy, enterprise
@@ -3152,6 +3345,7 @@ source with Add to pipeline on each row.
 ---
 
 ### BL-SCOUT-PORTALS — Enterprise portals as Scout sources
+**Priority:** P1  ·  **Effort:** L  ·  **Status:** 🟡 the email route shipped as BL-SCOUT-INBOX (PR #460 to #462); connectors to commercial and state portals not started, waiting on the owner's choice of the first ones
 
 **Owner, 2026-11-06:** first state portals, primes' supplier portals and
 commercial aggregators. **Research (2026-11-06; from search results of
@@ -3185,6 +3379,7 @@ access. **To decide:** which first, and whether to approach the vendors.
 ---
 
 ### BL-SCOUT-INBOX — Portals mail FORGE directly
+**Priority:** P0  ·  **Effort:** L  ·  **Status:** 🔄 phase 1 (PR #460), phase 2 (PR #461) and the Exchange mailbox (PR #462) shipped; ⏳ phase 3 (the company's own domain) and phase 4 (dedicated portal readers) not started
 
 **Owner, 2026-11-06:** "I don't want a forwarding address; I want the
 portal to ingest emails directly from the source … a unique Forge domain
@@ -3260,6 +3455,7 @@ shipped on Postmark's inbound webhook, replaced in phase 2b).
 ---
 
 ### BL-SCOUT-GWAC — GWACs as a Scout source
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ⏳ not started (queued by the owner, 2026-11-03); the owner's decisions are open (which vehicles first, API or email, how a company records the vehicles it holds)
 
 **Owner, 2026-11-03:** GWACs go on the backlog; the Scout page does not
 list them until they are built. **Ask (FORGE II, footnote 3):** Scout
@@ -3461,6 +3657,7 @@ old domain (the browser refuses) and email links pointed there.
 ---
 
 ### BL-NAV-LIFECYCLE — The everyday menu is the proposal lifecycle
+**Priority:** P1  ·  **Effort:** XL (one PR or more per phase)  ·  **Status:** 🔄 phases 0 to 6 shipped: 0 the menu (PR #449, corrected in PR #452), 1 Identify (PR #453), 2 Evaluate (PR #463 to #469), 3 Capture (PR #470 to #478), 4 Plan (PR #483 to #487), 5 Develop (PR #488 to #502), 6 Deliver (PR #503 to #510); migrations 0150 to 0180 · ⏳ phase 7 Measure, phase 8 the partner portal and phase 9 the stage names not started, and no design document exists for them
 
 **Owner, 2026-11-01 (FORGE II document):** the everyday sidebar
 follows the proposal lifecycle, **Identify → Evaluate → Capture → Plan →
@@ -6663,7 +6860,7 @@ through the row list.
 | Proposals In-flight / Submitted tabs | Merged #97 |
 | Help → FAQ page | Merged #98 |
 | Nav rebuild — 6-item structure | Merged #99 |
-| Proposal launcher (queue ingest + manual chain) | Open #100 |
+| Proposal launcher (queue ingest + manual chain) | Merged #100 |
 
 ---
 
@@ -6838,7 +7035,7 @@ include an Add Source option" ask in the original spec.
 
 Both pages already shared `getOrganizationSnapshot()` and the
 Command Center had the stage-grid mirror via `CommandCenterStageGrid`
-shipped in earlier work. This PR closes the audit gaps the spec
+shipped in earlier work. PR #141 closed the audit gaps the spec
 called for.
 
 **Already in place (foundation):**
@@ -6900,7 +7097,7 @@ Proposals" lands on the launcher; tab label reads "Past proposals".
 ---
 
 ### BL-9 — Word-level collaborative editor with track changes
-**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c operator-pending; Slice 6 queued
+**Priority:** P1  ·  **Effort:** XL (4-6 weeks)  ·  **Depends on:** —  ·  **Status:** 🟡 Slices 1, 2a, 2b, 2d, 3, 4, 5a, 5b, 5c, 7 shipped (5c: PR #238; 7: PR #268); 2c ⏳ operator deploy (the collaboration server and the flag), engineering complete; Slice 6 ⏸ gated (2026-10-04: the move to AWS and a federal / CUI customer)
 
 Per spec: full Word-comparable editor; multi-user real-time collab;
 track changes; merge on document-owner consensus; uses company
@@ -6962,7 +7159,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
   `@user` mentions, in-app notifications, optional `extension-redis`
   for horizontal Hocuspocus scale. ✅ *shipped (PR #227)*
 - **Slice 5** — Suggestion mode + version snapshots + diff viewer.
-  - **Slice 5a — Suggestion mode** (in-flight): the `TrackChanges`
+  - **Slice 5a — Suggestion mode** (shipped, PR #236): the `TrackChanges`
     extension grows a third state alongside `trackingEnabled`:
     `editorMode: "edit" | "suggest" | "view"`. `view` makes the
     editor read-only via `editor.setEditable(false)`; `suggest` is
@@ -6978,7 +7175,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     section's assigned `authorUserId` (ownerless sections fall
     back to owner-mode for the current user to avoid locking out
     single-author drafts).
-  - **Slice 5b — Version snapshots** (in-flight): new
+  - **Slice 5b — Version snapshots** (shipped, PR #237): new
     `proposal_section_snapshot` table (org-scoped) holding a
     point-in-time copy of `body_doc`, the word count, the author's
     name (denormalized so deleted users still attribute correctly),
@@ -6991,7 +7188,7 @@ PartyKit / Ably all disqualified for FedRAMP path or maturity).
     with restore + delete buttons (owner-only); non-owners see the
     list read-only. Each create / restore / delete writes an audit
     row.
-  - **Slice 5c — Diff viewer** (in-flight): each snapshot row in
+  - **Slice 5c — Diff viewer** (shipped, PR #238): each snapshot row in
     the sidebar grows a "Diff" button that opens a modal comparing
     that snapshot's projected plain text against the section's
     current body. Diffing happens client-side with `jsdiff`'s
@@ -7653,6 +7850,7 @@ notification delivered; SLA breach escalates to PM if not acknowledged.
 ---
 
 ### BL-14 — Settings page route split ✅ SHIPPED
+**Priority:** P2  ·  **Effort:** S  ·  **Status:** ✅ shipped (PR #124; the `/users` consolidation PR #123)
 
 PR #99 deep-linked Settings tabs via `?tab=integrations`. The spec
 asks them to be separate menu items; they're treated as such, but
@@ -7683,7 +7881,7 @@ back/forward works; deep-linking via `?tab=` no longer needed.
 > hides + route gates + database row-level filters.
 
 ### BL-15 — Tenant Administration
-**Priority:** P0  ·  **Effort:** L (phased)  ·  **Depends on:** BL-12 (uses audit log)
+**Priority:** P0  ·  **Effort:** L (phased)  ·  **Depends on:** BL-12 (uses audit log)  ·  **Status:** ✅ shipped (Phase A PR #159 · B-1 export PR #165 · B-2 transfer ownership PR #179 · B-3a activity and per-tenant users PR #199 · B-3b assume-identity PR #229, tests PR #233 · B-3c isolation check PR #239, tests PR #241). Not built: the async full-snapshot export, noted as future work
 
 Per spec: "this is where the customer accounts are managed."
 
@@ -7893,7 +8091,7 @@ audit log.
 ---
 
 ### BL-16 — Platform Configuration (tier model)
-**Priority:** P1  ·  **Effort:** L (phased)  ·  **Depends on:** BL-15
+**Priority:** P1  ·  **Effort:** L (phased)  ·  **Depends on:** BL-15  ·  **Status:** ✅ shipped (A PR #168 · B-1 to B-3c PR #169 to #173 · B-3d PR #225 · C-1 to C-4 PR #174 to #176, #178 · tests PR #231 · first-tier fix PR #282 · apiAccess PR #322 · customTemplates PR #323 · API Slice 2a PR #333 · 2b PR #334)  ·  ⏸ API Slice 2c, outbound webhooks, parked (owner, 2026-10-04: BL-AIX first). Not built: redeeming FORGE's own promo codes (Checkout takes Stripe's), API write endpoints
 
 Per spec: "tailor offerings with promotions and various levels:
 Bronze, Silver, Gold, Platinum, Custom."
@@ -8008,7 +8206,7 @@ built or need design work):
   actions (winner analysis, AI section draft, compliance preflight).
   Counter increments on every attempt, including failed AI calls —
   simpler call pattern at the cost of slightly inflated counts on
-  network errors. Refund semantics queued if accuracy ever matters.
+  network errors. Refund semantics shipped in Phase B-3d (PR #225).
 - `proposalsPerMonth` bumped from `createProposalAction`.
 - Each gated action catches `QuotaExceededError` and surfaces the
   upgrade-prompt message via the existing `{ ok: false, error }`
@@ -8277,7 +8475,7 @@ Without `customTemplates`:
 **What ships in a later phase**: the actual redemption flow
 (applying a code to a `tenant_subscription` to discount the next
 period's price). Redemption pairs with **BL-17** billing
-integration; the code data model is in place for when that lands.
+integration; BL-17 has shipped; redemption is still not built (Checkout takes Stripe's promotion codes).
 
 **Acceptance (full ticket):** create Custom tier with
 `aiRequestsPerMonth=0` (treated as deny under Phase B semantics;
@@ -8287,7 +8485,7 @@ run any AI feature → upgrade to Gold → AI features work.
 ---
 
 ### BL-17 — Subscriptions module
-**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-16
+**Priority:** P1  ·  **Effort:** L  ·  **Depends on:** BL-16  ·  **Status:** ✅ Slices 1 to 5 shipped (ADR PR #218 · schema and webhooks PR #219 · Checkout PR #220 · portal, dunning and tier flip PR #221 · enterprise wire invoice PR #222 · webhook tests PR #234); the wire-invoice flow is paused pending launch readiness (2026-06-20). Trials came with BL-AUTH-ABUSE (PR #320, #321). Not built: the super-admin subscription list by tier, status and expiry
 
 Per spec: "currently active subscriptions, trials, subscription
 types, and expiring subscriptions."
@@ -8334,7 +8532,7 @@ Cross-tenant super-admin view of the BL-12 audit log.
 
 **Deferred (separate ticket):** The legacy `AuditLogTab` in
 `/admin` (synthesizes events from raw table activity via
-`getRecentAuditEvents`) was **not** removed by PR #150. Different
+`getRecentAuditEvents`) was **not** removed by PR #138 (BL-18-cleanup removed it, PR #144). Different
 data model than the BL-12 `audit_log` table — the legacy tab shows
 derived events (`org_created`, `proposal_updated`) timestamped from
 the originating table's `createdAt`, while the new view shows
@@ -8375,6 +8573,7 @@ the BL-18 view; no regression in the tenants page.
 ## Cross-cutting / foundation
 
 ### BL-19 — Multi-tenant isolation continuous verification
+**Priority:** P0  ·  **Effort:** S (Phase 1) + M (Phase 2)  ·  **Status:** ✅ shipped (Phase 1, the static check, PR #134; Phase 2, runtime tests and the CI job, PR #230; gates widened by the BL-TENANT-AUDIT re-run, PR #261)
 
 **Phase 1: static analyzer ✅ SHIPPED**
 
@@ -8530,7 +8729,7 @@ status checks in Settings → Branches → main.
 ---
 
 ### BL-QC-neon — Neon branch per PR — **shipped (workflow); operator setup pending**
-**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ workflow shipped; awaits operator config
+**Priority:** P1  ·  **Effort:** M  ·  **Depends on:** BL-QC  ·  **Status:** ✅ workflow shipped (PR #149); awaits operator config (`NEON_API_KEY`, `NEON_PROJECT_ID`)
 
 **Shipped:**
 - New workflow `.github/workflows/neon-branch.yml`:
@@ -8558,7 +8757,7 @@ status checks in Settings → Branches → main.
 - Add `Create Neon branch` + `Delete Neon branch` to required
   status checks in Settings → Branches → main
 
-**Future follow-up (BL-QC-neon-migration-rewire):** modify the
+**Follow-up (BL-QC-neon-migration-rewire, shipped, PR #163):** modify the
 existing `Fresh-DB migration verification` job in `pr.yml` to use
 the per-PR Neon branch when configured (falling back to the
 ephemeral Postgres service when not). That gives migrations a test
@@ -8569,7 +8768,7 @@ being live + verified working.
 **Acceptance:** ✅ Opening a PR creates a Neon branch (once
 configured); closing/merging deletes it; the connection string is
 posted as a PR comment. Vercel preview auto-uses the branch via the
-Neon integration. Migration-rewire deferred.
+Neon integration. Migration-rewire shipped (PR #163).
 
 ---
 
@@ -8602,7 +8801,7 @@ configured, giving the migration test real production schema shape.
 ---
 
 ### BL-QC-links — Internal link check + the `/onboarding` dead end — **shipped**
-**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263)
+**Priority:** P0  ·  **Effort:** S  ·  **Depends on:** BL-QC  ·  **Status:** ✅ shipped (PR #263; follow-up PR #264)
 
 Reported as "many links in the side menu are not working". Root cause:
 `requireCurrentOrg()` (`src/lib/auth-helpers.ts`) redirects to
@@ -8870,7 +9069,7 @@ free tier is generous but Vercel-bundled Sentry was auto-reloading
 $25/mo via "Investigations" credit even before active use).
 
 **Replaced by:** `BL-QC-errors` — in-app `production_error` table +
-`/admin/errors` viewer (follow-up PR after this one lands).
+`/admin/errors` viewer (shipped, PR #196).
 
 ---
 
@@ -8880,7 +9079,7 @@ $25/mo via "Investigations" credit even before active use).
 Restores the cost-conscious posture established when Vercel Agent was
 retired (BL-QC-vercel-agent-retired). Sentry crept back in via PR #193
 which was merged after I marked it closed but before the close took
-effect. This PR cleanly removes every Sentry surface so future searches
+effect. PR #195 cleanly removed every Sentry surface so future searches
 of the codebase don't surface "is Sentry coming back?" ambiguity.
 
 **Removed:**
@@ -8993,7 +9192,7 @@ bug coming back is visible).
 BL-QC-errors landed the `production_error` table + admin viewer, but
 the 99 existing `log.error(...)` catch sites in the codebase still
 only wrote to Vercel logs — they didn't populate the new in-app
-viewer. This PR closes that gap with a minimal-touch wiring rather
+viewer. PR #198 closes that gap with a minimal-touch wiring rather
 than a 99-site sweep.
 
 **What ships:**
@@ -9051,7 +9250,7 @@ idempotent recovery SQL via the Neon SQL Editor. The 7 missing tables
 now exist on production. Audit log persistence works again,
 `/admin/orgs/[id]` renders, recordAudit succeeds.
 
-**This PR — SDLC closure:**
+**PR #202 — SDLC closure:**
 
 - New migration `drizzle/0052_repair_false_applied_ledger.sql` that
   idempotently re-creates the 7 missing tables. Mirrors the content
@@ -9085,7 +9284,7 @@ now exist on production. Audit log persistence works again,
 the ledger has 0052 applied. Fresh-DB CI passes (proves migration
 0052 is idempotent + composes with 0000-0051).
 
-**Hardening follow-up (queued, separate PR):**
+**Hardening follow-up (shipped: the drift detector PR #203; the Sync ledger button removed PR #204):**
 
 - BL-QC-ledger-drift-detector — detect "ledger says applied but
   target table missing" on boot. Auto-recover where safe, refuse to
@@ -9156,7 +9355,7 @@ not days.
 Final cleanup of the 2026-06-15 incident root cause. PR #203's
 hardening (`markMigrationsAppliedThrough` refuses to mark applied
 when target tables are missing) made the function safe, but the UI
-affordance was still confusing and easy to misuse. This PR removes
+affordance was still confusing and easy to misuse. PR #204 removes
 the UI entry point entirely.
 
 **Removed:**
@@ -9425,7 +9624,7 @@ tenant's surface.
 ---
 
 ### BL-21 — Help content refresh
-**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** rolling
+**Priority:** P3  ·  **Effort:** S  ·  **Depends on:** —  ·  **Status:** rolling; last dedicated pass PR #331 (2026-10-04); queue empty; since then each feature PR updates the manuals itself (AGENTS.md convention 12)
 
 PR #98 added FAQ. User Guide (`/help/user`) and Admin Guide
 (`/help/admin`) markdown is updated as features ship.
@@ -9720,7 +9919,7 @@ matrix, winner analysis, AI scan, content generation, chat). Items
 are grouped by surface and given a stable **BL-FB-*** ID. Priorities
 reflect impact on **win rate** and **time saved per pursuit** — the
 two outcomes federal contractors actually measure. Final prioritization
-pending operator review.
+pending operator review. (2026-11-20: every item in this section has shipped, PR #245 to #330.)
 
 ### Area 1 — Solicitation intake ("RFP Command Center")
 
@@ -9754,7 +9953,7 @@ matrix. Persists Q&A history with timestamps; auto-flags the row in
 the matrix as "amended by Q&A".
 
 ### BL-FB-SOL-CALENDAR — Key-date calendar with reminders
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #259)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
 Auto-extract every key milestone from the solicitation (Q&A cutoff,
 site visit, final RFP, proposal due, oral presentation, expected award,
@@ -9847,7 +10046,7 @@ the questions a procurement attorney would ask, and the deadline math
 email. Recorded on the debrief row.
 
 ### BL-FB-WIN-PROTEST — Protest viability check
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #257)
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped (PR #255)
 
 Given the debrief weaknesses + the awardee's USAspending profile +
 the solicitation's evaluation criteria, surface "is there a credible
@@ -9952,7 +10151,7 @@ into a single proposal-level scan every N minutes. Foundation for
 all downstream scan enhancements (themes, contradiction, tone).
 
 ### BL-FB-SCAN-THEMES — Win-theme consistency check
-**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #258)
+**Priority:** P1  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #256)
 
 Set 3 win themes upfront on the proposal (e.g. "FedRAMP High depth,"
 "lowest-risk transition," "DEI in workforce"). The scan checks every
@@ -9960,7 +10159,7 @@ section reinforces them; flags sections that drift off-theme.
 Surfaces theme coverage as a per-section badge.
 
 ### BL-FB-SCAN-CONTRADICTION — Cross-volume contradiction detection
-**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #260)
+**Priority:** P2  ·  **Effort:** M  ·  **Status:** ✅ shipped (PR #257)
 
 Detect inconsistencies between volumes — e.g., Technical Volume claims
 24/7 operations, Management Volume staffs only business hours.
@@ -10178,7 +10377,7 @@ direct path to "less generic content" (the issue #6 we already
 addressed) becoming "deeply specific, on-brand content."
 
 ### BL-FB-X-PWIN-MODEL — Calibrated PWin model
-**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258)
+**Priority:** P2  ·  **Effort:** L  ·  **Status:** ✅ shipped v1 (PR #258; nightly snapshots PR #291; capability factor PR #423). The trained model waits on about 100 decided outcomes per organization
 
 Train a model on your historical outcomes (NAICS × agency × set-aside
 × incumbent × company size × proposal stage × time-in-stage) to
@@ -10489,6 +10688,11 @@ the scan already sits in the `strong` routing class. Watch
 
 ## Effort summary
 
+> **History (as planned 2026-05-04).** All 23 original items have shipped
+> (PR #102 to #334), except BL-9 Slice 2c (operator deploy) and Slice 6
+> (gated); BL-21 is continuous. For the current state see "State of the
+> backlog" at the top.
+
 | Category | Items | Total effort |
 |---|---|---|
 | Cleanup / debt | BL-1, BL-2 (shipped) | ~1 day |
@@ -10503,11 +10707,15 @@ the scan already sits in the `strong` routing class. Watch
 
 ## Recommended execution order
 
+> **History (as planned 2026-05-04).** Items 1 to 20 below have shipped;
+> of BL-9 only Slices 2c and 6 remain. What comes next is under "Next"
+> in "State of the backlog" at the top.
+
 Strict P0 / P1 / P2 ordering, with parallelism where dependencies allow:
 
 1. ~~**BL-1, BL-2**~~ — placeholder debt closed (PR #102)
 2. ~~**BL-22**~~ — nav v2 visual refresh (PR #103)
-3. **BL-3** — small, ships visible polish (stage widgets) ← **next**
+3. **BL-3** — small, ships visible polish (stage widgets)
 4. **BL-7** — tied to BL-3; wire the same widgets to Command Center
 5. **BL-4** — pipeline funnel (visible win)
 6. **BL-5** — GSA paste (mirrors existing eBuy paste; well-trodden)
@@ -10527,8 +10735,9 @@ Strict P0 / P1 / P2 ordering, with parallelism where dependencies allow:
 19. **BL-20** — Auth decision logging
 20. **BL-11** — Brain self-improvement loop
 21. **BL-9 (XL)** — Word-level collab editor (the big one)
-19. **BL-21** — Help content refresh (continuous)
+22. **BL-21** — Help content refresh (continuous)
 
 This document is the single source of truth for backlog items.
 Update it in the same PR that ships an item — mark status, link the
-PR number, note any scope changes.
+PR number, note any scope changes, and update "State of the backlog"
+at the top. Never write "this PR" in a status.
