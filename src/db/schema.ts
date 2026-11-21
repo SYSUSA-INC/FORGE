@@ -2892,7 +2892,11 @@ export const solicitationTypeEnum = pgEnum("solicitation_type", [
 // BL-FB-SOL-BUNDLE — companion document types within a solicitation bundle.
 export const solicitationDocumentTypeEnum = pgEnum(
   "solicitation_document_type",
-  ["rfp", "pws", "sow", "cdrl", "j_attachment", "amendment", "other"],
+  // BL-STAB-3 (drizzle/0181) — "qa", "pricing" and "form": contracting
+  // officer Q&A, pricing sheets and forms. Pricing sheets and forms are
+  // stored and readable but never swept for requirements; a Q&A file is
+  // read into `solicitation_qa`.
+  ["rfp", "pws", "sow", "cdrl", "j_attachment", "amendment", "other", "qa", "pricing", "form"],
 );
 
 export const solicitations = pgTable("solicitation", {
@@ -3049,10 +3053,13 @@ export const solicitationQa = pgTable(
     dedupeKey: text("dedupe_key").notNull().default(""),
     postedAt: timestamp("posted_at", { withTimezone: true }),
     addedByUserId: text("added_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    /** BL-STAB-3 — the companion document (type "qa") these answers were read from; they are removed with it. */
+    sourceDocumentId: uuid("source_document_id").references((): AnyPgColumn => solicitationDocuments.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     orgSolicitationIdx: index("solicitation_qa_org_solicitation_idx").on(t.organizationId, t.solicitationId),
+    sourceDocumentIdx: index("solicitation_qa_source_document_idx").on(t.sourceDocumentId),
     dedupeIdx: uniqueIndex("solicitation_qa_dedupe_idx").on(t.solicitationId, t.dedupeKey),
   }),
 );

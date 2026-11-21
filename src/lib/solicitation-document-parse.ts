@@ -16,6 +16,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { solicitationDocuments, type SolicitationRequirement } from "@/db/schema";
+import { addQaFromDocument } from "@/lib/solicitation-qa";
 import type { AIDocumentMedia } from "@/lib/ai";
 import {
   aiExtractSolicitation,
@@ -39,10 +40,11 @@ export async function parseSolicitationDocumentFromBytes(
   fileName: string,
   contentType: string,
 ): Promise<void> {
-  await db
+  const [doc] = await db
     .update(solicitationDocuments)
     .set({ parseStatus: "parsing", parseError: "", updatedAt: new Date() })
-    .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
+    .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)))
+    .returning({ documentType: solicitationDocuments.documentType, uploadedByUserId: solicitationDocuments.uploadedByUserId });
 
   const fail = async (msg: string, rawText = "") => {
     await db
@@ -68,6 +70,23 @@ export async function parseSolicitationDocumentFromBytes(
     format = res.format;
   } catch {
     format = detectFormat(contentType, fileName);
+  }
+
+  // BL-STAB-3 — pricing sheets, forms and Q&A files are kept and readable
+  // but never swept for requirements (no AI call). A Q&A file's answers
+  // are read into the Q&A panel with the paste reader.
+  const kind = doc?.documentType;
+  if (kind === "pricing" || kind === "form" || kind === "qa") {
+    if (kind === "qa") {
+      const qa = await addQaFromDocument({ organizationId, solicitationId, documentId, fileName, text: rawText, addedByUserId: doc?.uploadedByUserId ?? null });
+      if (!qa.ok) { await fail(qa.error, rawText); return; }
+    }
+    await db
+      .update(solicitationDocuments)
+      .set({ parseStatus: "parsed", parseError: "", rawText: rawText.slice(0, RAW_TEXT_CAP), extractedRequirements: [], updatedAt: new Date() })
+      .where(and(eq(solicitationDocuments.organizationId, organizationId), eq(solicitationDocuments.id, documentId)));
+    revalidatePath(`/solicitations/${solicitationId}`);
+    return;
   }
 
   if (format === "image") {
