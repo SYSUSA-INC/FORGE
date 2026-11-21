@@ -22,7 +22,7 @@ Effort key:
 
 ## State of the backlog
 
-**As of 2026-11-21, `main` at `a8ab038`, through PR #514, plus BL-STAB-3a (PR for `claude/stab-3a-classify`).** Checked
+**As of 2026-11-21, `main` at `a8ab038`, through PR #514, plus BL-STAB-3a (PR #515).** Checked
 against the merged pull requests and the code, not against the entries'
 own wording. If the date or the sha here is old, check `git log` before
 trusting a status below, and correct this section in the same PR.
@@ -49,7 +49,7 @@ standing tracks: **BL-STAB** (problems the owner found in testing, P0),
 | Billing and plans | BL-17 Stripe, BL-PACKAGES and add-ons, BL-AUTH-ABUSE trials, the BL-16 API | #212 to #215, #218 to #222, #317 to #326, #333, #334 |
 | User feedback, BL-FB-* | All 35 items | #245 to #260, #296 to #316, #327 to #330 |
 | AI platform | BL-AI-* (#257), BL-AIP remediation, BL-AIX phases 0a to 2c-1 | #269 to #295, #335 to #358 |
-| BL-STAB | 1, 2, 4a, 6, 7, 9, 10 (except 10c), 11, 8a mandatory two-step sign-in, 8b email validation, 3a (the labelling rules, the Q&A, pricing and form document types, filing a batch on the server) | #359 to #396, #399, #415, #416, #439 to #448, #450; 3a: PR for `claude/stab-3a-classify` |
+| BL-STAB | 1, 2, 4a, 6, 7, 9, 10 (except 10c), 11, 8a mandatory two-step sign-in, 8b email validation, 3a (the labelling rules, the Q&A, pricing and form document types, filing a batch on the server) | #359 to #396, #399, #415, #416, #439 to #448, #450; 3a: PR #515 |
 | The look | BL-UI-THEME, BL-UI-ENABLENOW, BL-UI-UNIFORM, BL-PIPE-DRILL, BL-PIPE-FUNNEL, BL-PIPE-STAGES | #272, #387, #398, #400 to #413, #417 to #420, #481, #482 |
 | BL-VISION-AUTOPILOT phases 1, 3, 4, 5 | BL-CAP-MATRIX, BL-COMPANY-MODEL, BL-LESSONS-LOOP, BL-NEXT-ACTION | #421 to #437 |
 | Scout | QUALITY, REACH, AMEND, ONEPAGE, INBOX phases 1 and 2, FILES, BACKFILL, FIT, LEARN, SHOWN | #455 to #462, #468, #475, #490 to #494 |
@@ -61,7 +61,7 @@ standing tracks: **BL-STAB** (problems the owner found in testing, P0),
 
 | Entry | What remains | Waits on |
 |---|---|---|
-| BL-STAB-3 | 3b: the New Solicitation page takes several files, shows each label with its evidence and files the batch once every label is confirmed. 3c: the AI check for labels the rules leave weak. (3a, the rules and the server side, is in PR for `claude/stab-3a-classify`.) | Nothing; the owner's decisions are recorded (2026-10-21) |
+| BL-STAB-3 | 3b: the New Solicitation page takes several files, shows each label with its evidence and files the batch once every label is confirmed. 3c: the AI check for labels the rules leave weak. (3a, the rules and the server side, is in PR #515.) | Nothing; the owner's decisions are recorded (2026-10-21) |
 | BL-STAB-4b | Each amendment compared with the one before it | Nothing |
 | BL-STAB-5 | Contracting officer Q&A uploaded in the format it was released | Nothing |
 | BL-STAB-8c | A verified mobile phone | The number can be captured now; the text-message step waits on the owner choosing a provider |
@@ -177,7 +177,7 @@ True on `main` and not scheduled:
 **BL-STAB first** (owner, 2026-11-21). The remaining BL-STAB items come
 before phase 7, Measure:
 
-1. **BL-STAB-3** (3a in PR for `claude/stab-3a-classify`; then 3b the page, 3c the AI check);
+1. **BL-STAB-3** (3a in PR #515; then 3b the page, 3c the AI check);
 2. **BL-STAB-4b**, each amendment compared with the one before it;
 3. **BL-STAB-5**, Q&A uploaded in the format it was released;
 4. **BL-STAB-8c** and **8d** after those: 8c's text-message step waits on
@@ -271,7 +271,7 @@ above.
 | 3aw | **BL-STAB-7** — A company admin sets the company's own SAM.gov API key (encrypted, tested on save); SAM.gov errors in plain words | P0 | L | ✅ shipped: 7a #370, 7b #371, 7c #372, 7d #373, 7e #388 |
 | 3aw-1 | **BL-STAB-10** — Import from SAM.gov ignored the keyword (NAICS 541519 + "ServiceNow" listed unrelated award notices): FORGE checks the keyword itself, open notice types by default, one row per solicitation, honest counts; the scout's keyword finds are confirmed | P0 | M | ✅ shipped: 10a (PR #375); 10b (PR #376 to #383, and 10b-4 in PR #385); 10d (PR #385); 10e (PR #386). 10c (a reserve for the shared key) waits on what the quota logs show |
 | 3aw-2 | **BL-STAB-11** — The platform admin home, a tenant's admin page and a tenant's activity page failed with a server error ("malformed array literal") once a cross-domain invite was waiting or anyone had acted in the tenant: a list was handed to Postgres where an array was expected; `inArray` now, and a test stops the shape coming back | P0 | S | ✅ shipped (#399) |
-| 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | 🔄 3a (the labelling rules, three new document types, filing a batch on the server) in PR for `claude/stab-3a-classify`; 3b the page and 3c the AI check queued |
+| 3ax | **BL-STAB-3** — New Solicitation takes several files at once; FORGE classifies each and files it | P0 | M | 🔄 3a (the labelling rules, three new document types, filing a batch on the server) in PR #515; 3b the page and 3c the AI check queued |
 | 3ay | **BL-STAB-4** — Several amendments uploaded in one go | P0 | S | 🔄 4a (several at once, numbers from file names) shipped (PR #368); 4b (each diffed against the one before) queued |
 | 3az | **BL-STAB-6** — Several companion documents uploaded in one go, each typed from its file name, straight to storage | P0 | S | ✅ shipped (PR #369, with BL-STAB-2d-1) |
 | 3bd | **BL-PIPE-DRILL** — The pipeline's In window, Active, Win rate and Pipeline value tiles, and each funnel stage, open the opportunities behind them (owner, 2026-10-13); one rule set (`pipeline-drill.ts`: window, views, weighted value) makes the numbers and the lists, so a count equals its list, a rate its won and lost, a total its sum; the stage picked shows its count, the way back keeps the window and view | P1 | S | ✅ shipped (#387) |
@@ -392,7 +392,7 @@ diffs `pg_indexes` against both sources in CI.
 - No SQL change: the database already has all of this. The PR carries the
   `schema-no-migration` label for the coupling gate.
 ### BL-STAB — Stabilization: issues from the owner's testing (2026-10-08)
-**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ✅ BL-STAB-10 shipped (10a in PR #375, 10b in PR #376 to #383 and #385, 10d in PR #385, 10e in PR #386; 10c, a reserve for the shared key, waits on the quota logs) · ✅ BL-STAB-11 shipped (PR #399) · 🔄 BL-STAB-8 (8a shipped in PR #415, #416 and #439 to #445; 8b shipped in PR #446 to #448 and #450; 8c verified mobile phone and 8d Cloudflare not started) · 🔄 BL-STAB-3 (3a in PR for `claude/stab-3a-classify`; 3b and 3c queued) · ⏳ 4b and 5 not started
+**Priority:** P0  ·  **Effort:** XL (one PR per issue or phase)  ·  **Status:** ✅ BL-STAB-1 shipped (PR #359, #360) · ✅ BL-STAB-2 shipped (2a in PR #361 to #363, 2b in PR #364, 2c in PR #365 and #368, 2d-1 in PR #369, the R2 size fix in PR #374, the upload sweep 2d-2 in PR #389, GSA attachments 2d-3 in PR #390, knowledge corpus 2e-1 in PR #391, storage meter and zip checks 2e-2 in PR #392, deletes and templates 2f-1 in PR #393 and #394, chat attachments 2f-2 in PR #395, contacts import and paste guards 2f-3 in PR #396) · ✅ BL-STAB-9 shipped (PR #366, #367) · 🔄 BL-STAB-4 (4a shipped in PR #368) · ✅ BL-STAB-6 shipped (PR #369) · ✅ BL-STAB-7 shipped (7a in PR #370, 7b in PR #371, 7c in PR #372, 7d in PR #373, 7e in PR #388) · ✅ BL-STAB-10 shipped (10a in PR #375, 10b in PR #376 to #383 and #385, 10d in PR #385, 10e in PR #386; 10c, a reserve for the shared key, waits on the quota logs) · ✅ BL-STAB-11 shipped (PR #399) · 🔄 BL-STAB-8 (8a shipped in PR #415, #416 and #439 to #445; 8b shipped in PR #446 to #448 and #450; 8c verified mobile phone and 8d Cloudflare not started) · 🔄 BL-STAB-3 (3a in PR #515; 3b and 3c queued) · ⏳ 4b and 5 not started
 
 The owner began testing the shipped features end to end (2026-10-08):
 "here are some initial problems that we need to address before we move
@@ -1696,7 +1696,7 @@ mind. Bandage will come off but a true fix will stay."
       link, because the provider verified them; the rest are asked at
       their next sign-in.
 - **BL-STAB-3 — New Solicitation accepts one file.** 🔄 3a in
-  PR for `claude/stab-3a-classify`; 3b (the page) and 3c (the AI check) queued. First of
+  PR #515; 3b (the page) and 3c (the AI check) queued. First of
   the remaining BL-STAB items (owner, 2026-11-21: "BL-STAB first").
   - **Ask:** Upload several files at once; FORGE decides what each is
     and how to file it.
@@ -1724,7 +1724,7 @@ mind. Bandage will come off but a true fix will stay."
       only when the rules are weak or disagree. Without AI, the label
       says it is rule-based. The user confirms every label before
       anything is filed.
-  - **3a — the rules and the server side (PR for `claude/stab-3a-classify`).**
+  - **3a — the rules and the server side (PR #515).**
     No change to the New Solicitation page yet.
     - `solicitation-file-classify.ts` labels one file: base
       solicitation, amendment, Q&A, PWS, SOW, CDRL, J attachment, RFP
