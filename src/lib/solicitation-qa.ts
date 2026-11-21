@@ -168,6 +168,84 @@ export async function addManualQa(input: {
   return { ok: true, ...res };
 }
 
+/**
+ * BL-STAB-3 — a Q&A file filed as a companion document (type "qa"): its
+ * answers are read with the same reader as a paste and carry the
+ * document's id, so they are removed with it.
+ */
+export async function addQaFromDocument(input: {
+  organizationId: string;
+  solicitationId: string;
+  documentId: string;
+  fileName: string;
+  text: string;
+  addedByUserId: string | null;
+}): Promise<QaIngestResult> {
+  const { organizationId } = input;
+  const sol = await solicitationForOrg(organizationId, input.solicitationId);
+  if (!sol) return { ok: false, error: "Solicitation not found." };
+  const pairs = parseQaPairs(input.text);
+  if (pairs.length === 0) {
+    return {
+      ok: false,
+      error: 'No question/answer pairs found in this file. FORGE reads lines like "Q: …" and "A: …" (or Question / Answer, Government Response); paste the answers in the Q&A panel if the file lays them out another way.',
+    };
+  }
+  const res = await storePairs({
+    organizationId,
+    sol,
+    pairs,
+    source: "attachment",
+    sourceRef: input.fileName,
+    sourceDocumentId: input.documentId,
+    postedAt: new Date(),
+    addedByUserId: input.addedByUserId,
+  });
+  await recordAudit({
+    organizationId,
+    actor: { userId: input.addedByUserId },
+    action: "solicitation.qa.add",
+    resourceType: "solicitation",
+    resourceId: input.solicitationId,
+    metadata: { pairs: pairs.length, documentId: input.documentId, fileName: input.fileName, ...res },
+  });
+  return { ok: true, ...res };
+}
+
+/**
+ * BL-STAB-3 — answers stored before the solicitation's requirements
+ * existed (a Q&A file filed in the same batch as the solicitation is read
+ * while the solicitation is still being parsed) are matched once they do.
+ * Only answers with no match yet are looked at. Returns how many gained one.
+ */
+export async function rematchSolicitationQa(input: { organizationId: string; solicitationId: string }): Promise<number> {
+  const { organizationId } = input;
+  const sol = await solicitationForOrg(organizationId, input.solicitationId);
+  if (!sol) return 0;
+  const requirements = activeRequirements(sol.extractedRequirements as ReviewedRequirement[]).map((r) => ({ ref: r.ref ?? "", text: r.text }));
+  if (requirements.length === 0) return 0;
+  const rows = await db
+    .select({ id: solicitationQa.id, question: solicitationQa.question, answer: solicitationQa.answer })
+    .from(solicitationQa)
+    .where(and(eq(solicitationQa.organizationId, organizationId), eq(solicitationQa.solicitationId, sol.id), sql`${solicitationQa.affectedRefs} = '[]'::jsonb`))
+    .limit(QA_LIMITS.maxPairs);
+  if (rows.length === 0) return 0;
+  const matches = matchQaToRequirements(rows.map((r, i) => ({ ordinal: i, question: r.question, answer: r.answer })), requirements);
+  let matched = 0;
+  for (const [i, row] of rows.entries()) {
+    const m = matches.get(i) ?? [];
+    const affectedRefs = [...new Set(m.map((x) => normalizeRef(x.ref)).filter(Boolean))];
+    if (m.length === 0 || affectedRefs.length === 0) continue;
+    await db
+      .update(solicitationQa)
+      .set({ affectedRefs })
+      .where(and(eq(solicitationQa.organizationId, organizationId), eq(solicitationQa.id, row.id)));
+    await flagComplianceItems({ organizationId, opportunityId: sol.opportunityId, qaId: row.id, matches: m });
+    matched++;
+  }
+  return matched;
+}
+
 export type QaPollResult =
   | {
       ok: true;
@@ -334,6 +412,8 @@ async function storePairs(input: {
   pairs: QaPair[];
   source: SolicitationQaSource;
   sourceRef: string;
+  /** BL-STAB-3 — the companion document the pairs were read from. */
+  sourceDocumentId?: string;
   postedAt: Date;
   addedByUserId: string | null;
 }): Promise<{ added: number; duplicates: number; flagged: number }> {
@@ -361,6 +441,7 @@ async function storePairs(input: {
         dedupeKey: qaDedupeKey(p.question, p.answer),
         postedAt: input.postedAt,
         addedByUserId: input.addedByUserId,
+        sourceDocumentId: input.sourceDocumentId ?? null,
       })
       .onConflictDoNothing({ target: [solicitationQa.solicitationId, solicitationQa.dedupeKey] })
       .returning({ id: solicitationQa.id });

@@ -588,7 +588,7 @@ export async function failClaim(i: { organizationId: string; uploadId: string; c
     .where(and(eq(fileUploads.organizationId, i.organizationId), eq(fileUploads.id, i.uploadId)));
 }
 
-export type StoredUploadPreview = { uploadId: string; fileName: string; size: number; format: UploadFormat; contentType: string };
+export type StoredUploadPreview = { uploadId: string; fileName: string; size: number; format: UploadFormat; contentType: string; /** Server-side only: never return it to the browser. */ storageKey: string };
 
 /**
  * Which of these uploads this user could file as `resourceType` right now,
@@ -621,7 +621,7 @@ export async function peekStoredUploads(i: {
     else if (row.status === "claimed") bad.push({ uploadId: id, fileName: row.fileName, reason: "This file was already saved." });
     else if (row.status !== "stored") bad.push({ uploadId: id, fileName: row.fileName, reason: view(row).message || "This file is not ready to save." });
     else if (!row.purgeAfter || row.purgeAfter.getTime() <= now) bad.push({ uploadId: id, fileName: row.fileName, reason: FAILURE_MESSAGES.unclaimed! });
-    else ready.push({ uploadId: id, fileName: row.fileName, size: row.storedSize ?? row.declaredSize, format: (row.detectedFormat || row.declaredFormat) as UploadFormat, contentType: row.contentType });
+    else ready.push({ uploadId: id, fileName: row.fileName, size: row.storedSize ?? row.declaredSize, format: (row.detectedFormat || row.declaredFormat) as UploadFormat, contentType: row.contentType, storageKey: row.storageKey });
   }
   return { ready, bad };
 }

@@ -51,6 +51,7 @@ import { handleSectionAutoDraft } from "@/lib/auto-draft-job";
 import { extractAndIndex } from "@/lib/knowledge-artifact-extract";
 import { harvestProposal } from "@/lib/proposal-harvest";
 import { parseSolicitationDocumentFromBytes } from "@/lib/solicitation-document-parse";
+import { rematchSolicitationQa } from "@/lib/solicitation-qa";
 import { parseSolicitationFromBytes } from "@/lib/solicitation-parse";
 import { detectFormat } from "@/lib/text-extract";
 import { isKeyInOrg, parseBudgetBytes, tooLargeToReadMessage, type UploadResourceType } from "@/lib/upload-policy";
@@ -514,6 +515,11 @@ async function handleSolicitationParse(job: BackgroundJob, ctx: JobContext): Pro
   }
 
   await parseSolicitationFromBytes(row.id, organizationId, loaded.bytes);
+  // BL-STAB-3 — Q&A filed in the same batch was read before these
+  // requirements existed: match it now. Never fails the parse.
+  await rematchSolicitationQa({ organizationId, solicitationId: row.id }).catch((err) =>
+    log.warn("[jobs]", "Q&A re-match after the parse failed", { jobId: job.id, error: err }),
+  );
 
   // The parser records its own outcome on the row; a reported failure
   // (unreadable file, AI refusal) is final for this job — the row shows

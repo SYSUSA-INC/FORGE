@@ -23,6 +23,9 @@ const DOC_TYPE_LABELS: Record<CompanionDocumentType, string> = {
   j_attachment: "J-Attach",
   amendment: "Amendment",
   other: "Other",
+  qa: "Q&A",
+  pricing: "Pricing",
+  form: "Form",
 };
 
 const DOC_TYPE_OPTIONS: Record<CompanionDocumentType, string> = {
@@ -32,6 +35,9 @@ const DOC_TYPE_OPTIONS: Record<CompanionDocumentType, string> = {
   j_attachment: "J-Attachment",
   amendment: "Amendment",
   rfp: "RFP (additional volume)",
+  qa: "Q&A — questions and answers (read into the Q&A panel)",
+  pricing: "Pricing sheet (kept, not read for requirements)",
+  form: "Form (kept, not read for requirements)",
   other: "Other",
 };
 
